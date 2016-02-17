@@ -1,0 +1,8 @@
+# include *.rst
+include *.md
+include src/__init__.py
+# recursive-include doc *
+recursive-include src *.py
+# recursive-include src/test *.dat
+recursive-include src/test *.py
+recursive-include src/test *.ipynb
