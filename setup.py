@@ -54,8 +54,8 @@ if __name__ == "__main__":
                        'Operating System :: Unix',
                        'Operating System :: MacOS'],
           platforms='any',
-	      packages=['fir'],
-	      package_dir={'fir': 'src'},
-	      package_data={'fir': ['test/*.ipynb', 'test/*.edf']} #,
+	      packages=['hedfpy'],
+	      package_dir={'hedfpy': 'src'},
+	      package_data={'hedfpy': ['test/*.ipynb', 'test/*.edf']} #,
        #    scripts=['bin/fir']
        )

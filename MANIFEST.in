@@ -4,5 +4,6 @@ include src/__init__.py
 # recursive-include doc *
 recursive-include src *.py
 # recursive-include src/test *.dat
-recursive-include src/test *.py
-recursive-include src/test *.ipynb
+recursive-include test *.py
+recursive-include test *.ipynb
+recursive-include test *.edf
