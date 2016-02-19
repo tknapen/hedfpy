@@ -18,7 +18,7 @@ if version is None:
     raise RuntimeError('Could not determine version')
 
 
-descr = """Finite Impulse Response package for time series analysis."""
+descr = """convert SR Research eyelink edf output to tabular hdf5 format."""
 
 DISTNAME = 'hedfpy'
 DESCRIPTION = descr
@@ -56,6 +56,5 @@ if __name__ == "__main__":
           platforms='any',
 	      packages=['hedfpy'],
 	      package_dir={'hedfpy': 'src'},
-	      package_data={'hedfpy': ['test/*.ipynb', 'test/*.edf']} #,
-       #    scripts=['bin/fir']
+	      package_data={'hedfpy': ['test/*.ipynb', 'test/*.edf']}
        )

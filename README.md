@@ -10,7 +10,7 @@ These are:
 for full parsing of the edf file data, hedfpy assumes a specific trial-based experimental format that is communicated to the eye tracker. Specifically, it looks for explicitly formatted messages by means of regular expressions. These messages detail the start and end of trial phases, trials, button press events, sound events and the stimulus parameters for a given trial which are all stored in tabular format in the HDF5 file. The parsing of these messages can be turned off for basic functionality.
 
 ## Dependencies
-numpy, scipy, matplotlib, statsmodels, sklearn, tables, sympy
+numpy, scipy, matplotlib, statsmodels, sklearn, tables, sympy, lmfit
 
 Further install requirements: hdf5 libraries, edf2asc command-line utility from SR Research
 

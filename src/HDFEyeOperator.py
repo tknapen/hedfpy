@@ -233,32 +233,35 @@ class HDFEyeOperator(Operator):
 						eso = EyeSignalOperator(input_object=eye_dict, eyelink_blink_data=blink_dict,sample_rate=sample_rate, eyelink_sac_data = sac_dict)
 					else:
 						eso = EyeSignalOperator(input_object=eye_dict,sample_rate=sample_rate)
-					# detect blinks (coalese period in samples):
-					# eso.blink_detection_pupil(coalesce_period=sample_rate*250./1000.)
+	
 					# interpolate blinks:
 					eso.interpolate_blinks(method='linear')
 					eso.interpolate_blinks2()
+
 					# low-pass and band-pass pupil data:
 					eso.filter_pupil(hp=pupil_hp, lp=pupil_lp)
-					# now dt the resulting pupil data:
-					eso.dt_pupil()
-					eso.regress_blinks()
+
 					# z-score filtered pupil data:
 					eso.zscore_pupil()
+
+					# regress blink and saccade responses
+					eso.regress_blinks()
+
+
 					# percent signal change filtered pupil data:
 					eso.percent_signal_change_pupil(dtype='lp_filt_pupil')
 					eso.percent_signal_change_pupil(dtype='lp_filt_pupil_clean')
 					eso.percent_signal_change_pupil(dtype='bp_filt_pupil')
 					eso.percent_signal_change_pupil(dtype='bp_filt_pupil_clean')
+
 					# now dt the resulting pupil data:
 					eso.dt_pupil()
-					# eso.regress_blinks()
 					
 					# add to existing dataframe:
 					bdf[eye+'_pupil_int'] = eso.interpolated_pupil
 					bdf[eye+'_pupil_hp'] = eso.hp_filt_pupil
 					bdf[eye+'_pupil_lp'] = eso.lp_filt_pupil
-					# bdf[eye+'_pupil_lp_zscore'] = eso.lp_filt_pupil_zscore
+
 					bdf[eye+'_pupil_lp_psc'] = eso.lp_filt_pupil_psc
 					bdf[eye+'_pupil_lp_diff'] = np.concatenate((np.array([0]),np.diff(eso.lp_filt_pupil)))
 					bdf[eye+'_pupil_bp'] = eso.bp_filt_pupil
@@ -266,9 +269,10 @@ class HDFEyeOperator(Operator):
 					bdf[eye+'_pupil_bp_zscore'] = eso.bp_filt_pupil_zscore
 					bdf[eye+'_pupil_bp_psc'] = eso.bp_filt_pupil_psc
 					bdf[eye+'_pupil_baseline'] = eso.baseline_filt_pupil
-					# bdf[eye+'_pupil_baseline_zscore'] = eso.baseline_filt_pupil_zscore
+
 					bdf[eye+'_gaze_x_int'] = eso.interpolated_x
 					bdf[eye+'_gaze_y_int'] = eso.interpolated_y
+
 					# blink/saccade regressed versions
 					bdf[eye+'_pupil_lp_clean'] = eso.lp_filt_pupil_clean
 					bdf[eye+'_pupil_lp_clean_psc'] = eso.lp_filt_pupil_clean_psc
@@ -471,4 +475,3 @@ class HDFEyeOperator(Operator):
 		with pd.get_store(self.input_object) as h5_file:
 			session_data = h5_file['%s/%s'%(alias, name)]
 		return session_data
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                  

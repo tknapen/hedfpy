@@ -17,21 +17,20 @@ import scipy as sp
 import numpy as np
 import pandas as pd
 import numpy.linalg as LA
-from Tools.other_scripts.savitzky_golay import *
 import matplotlib.pyplot as plt
 from math import *
 from scipy.signal import butter, lfilter, filtfilt, fftconvolve, resample
 import scipy.interpolate as interpolate
 import scipy.stats as stats
 import mne
-import fir
 from lmfit import minimize, Parameters, Parameter, report_fit
 
 from Operator import Operator
-import ArrayOperator
 
 import functions_jw_GLM
+import functions_jw as myfuncs
 
+import fir
 
 from IPython import embed as shell
 
@@ -118,8 +117,6 @@ def detect_saccade_from_data(xy_data = None, vel_data = None, l = 5, sample_rate
 			threshold_crossings_int[threshold_crossing_indices[-1]] = 0
 			threshold_crossing_indices = threshold_crossing_indices[:-1]
 		
-#		if threshold_crossing_indices.shape == 0:
-#			break
 		# check the durations of the saccades
 		threshold_crossing_indices_2x2 = threshold_crossing_indices.reshape((-1,2))
 		raw_saccade_durations = np.diff(threshold_crossing_indices_2x2, axis = 1).squeeze()
@@ -138,10 +135,7 @@ def detect_saccade_from_data(xy_data = None, vel_data = None, l = 5, sample_rate
 			valid_threshold_crossing_indices = threshold_crossing_indices_2x2
 		else:
 			valid_threshold_crossing_indices = threshold_crossing_indices_2x2[valid_saccades_bool]
-	
-		# print threshold_crossing_indices_2x2, valid_threshold_crossing_indices, blinks_during_saccades, ((raw_saccade_durations / sample_rate) > minimum_saccade_duration), right_times, valid_saccades_bool
-		# print raw_saccade_durations, sample_rate, minimum_saccade_duration		
-	
+		
 	saccades = []
 	for i, cis in enumerate(valid_threshold_crossing_indices):
 		# find the real start and end of the saccade by looking at when the acceleleration reverses sign before the start and after the end of the saccade:
@@ -205,7 +199,6 @@ def detect_saccade_from_data(xy_data = None, vel_data = None, l = 5, sample_rate
 		}
 		saccades.append(this_saccade)
 
-	# shell()
 	return saccades
 
 class EyeSignalOperator(Operator):
@@ -352,7 +345,6 @@ class EyeSignalOperator(Operator):
 		consistent with the fact that this method expects the self.interpolated_... variables to already exist.
 		"""
 		
-		from Tools.other_scripts import functions_jw as myfuncs
 		self.pupil_diff = (np.diff(self.interpolated_pupil) - np.diff(self.interpolated_pupil).mean()) / np.diff(self.interpolated_pupil).std()
 		self.peaks = myfuncs.detect_peaks(self.pupil_diff, mph=10, mpd=500, threshold=None, edge='rising', kpsh=False, valley=False, show=False, ax=False)[:-1] # last peak might not reflect blink...
 		if self.peaks != None:
@@ -486,9 +478,10 @@ class EyeSignalOperator(Operator):
 	def regress_blinks(self,):
 		
 		# params:
-		self.downsample_rate = 100
-		self.new_sample_rate = self.sample_rate / self.downsample_rate
-		interval = 5
+		interval = 6
+		x = np.linspace(0, interval, interval * self.sample_rate, endpoint=False)
+		
+		blink_time_course, sac_time_course = np.zeros((2,self.bp_filt_pupil.shape[0]))
 		
 		# events:
 		blinks = self.blink_ends / self.sample_rate
@@ -502,46 +495,7 @@ class EyeSignalOperator(Operator):
 		sacs = sacs[sacs>25]
 		sacs = sacs[sacs<((self.timepoints[-1]-self.timepoints[0])/self.sample_rate)-interval]
 		events = [blinks, sacs]
-		
-		# compute blink and sac kernels with deconvolution (on downsampled timeseries):
-		a = fir.FIRDeconvolution(signal=sp.signal.decimate(self.bp_filt_pupil, self.downsample_rate, 1), events=events, event_names=['blinks', 'sacs'], sample_frequency=self.new_sample_rate, deconvolution_frequency=self.new_sample_rate, deconvolution_interval=[0,interval],)
-		a.create_design_matrix()
-		a.regress()
-		a.betas_for_events()
-		self.blink_response_1 = np.array(a.betas_per_event_type[0]).ravel()
-		self.sac_response_1 = np.array(a.betas_per_event_type[1]).ravel()
-		
-		# compute blink and sac kernels with deconvolution (on downsampled timeseries): 
-		do = ArrayOperator.DeconvolutionOperator( input_object=sp.signal.decimate(self.bp_filt_pupil, self.downsample_rate, 1), eventObject=events, TR=(1.0 / self.new_sample_rate), deconvolutionSampleDuration=(1.0 / self.new_sample_rate), deconvolutionInterval=interval, run=True )
-		self.blink_response = np.array(do.deconvolvedTimeCoursesPerEventType[0]).ravel()
-		self.sac_response = np.array(do.deconvolvedTimeCoursesPerEventType[1]).ravel()
-		
-		# fix response:
-		# diff_response = np.diff(self.blink_response)
-		# if diff_response[:int(0.2*self.new_sample_rate)].mean() > 0:
-		# 	self.blink_response[0:np.where(diff_response < 0)[0][0]] = self.blink_response[np.where(diff_response < 0)[0][0]]
-		
-		# demean:
-		self.blink_response = self.blink_response - self.blink_response[:int(0.2*self.new_sample_rate)].mean()
-		self.sac_response = self.sac_response - self.sac_response[:int(0.2*self.new_sample_rate)].mean()
-		
-		# fit:
-		# ----
-		
-		# define objective function: returns the array to be minimized
-		def double_gamma_ls(params, x, data): 
-			
-			a1 = params['a1'].value
-			sh1 = params['sh1'].value
-			sc1 = params['sc1'].value
-			a2 = params['a2'].value
-			sh2 = params['sh2'].value
-			sc2 = params['sc2'].value
-			
-			model = a1 * sp.stats.gamma.pdf(x, sh1, loc=0.0, scale = sc1) + a2 * sp.stats.gamma.pdf(x, sh2, loc=0.0, scale = sc2)
-			
-			return model - data
-		
+
 		def double_gamma(params, x): 
 			a1 = params['a1']
 			sh1 = params['sh1']
@@ -550,88 +504,31 @@ class EyeSignalOperator(Operator):
 			sh2 = params['sh2']
 			sc2 = params['sc2']
 			return a1 * sp.stats.gamma.pdf(x, sh1, loc=0.0, scale = sc1) + a2 * sp.stats.gamma.pdf(x, sh2, loc=0.0, scale = sc2)
-		def pupil_IRF(params, x):
-			s1 = params['s1']
-			n1 = params['n1']
-			tmax1 = params['tmax1']
-			
-			return s1 * (x**n1) * (np.e**((-n1*x)/tmax1))
-		def double_pupil_IRF(params, x):
-			s1 = params['s1']
-			s2 = params['s2']
-			n1 = params['n1']
-			n2 = params['n2']
-			tmax1 = params['tmax1']
-			tmax2 = params['tmax2']
-			
-			return s1 * ((x**n1) * (np.e**((-n1*x)/tmax1))) + s2 * ((x**n2) * (np.e**((-n2*x)/tmax2)))
-			
-			
-		def double_pupil_IRF_ls(params, x, data):
-			s1 = params['s1'].value
-			s2 = params['s2'].value
-			n1 = params['n1'].value
-			n2 = params['n2'].value
-			tmax1 = params['tmax1'].value
-			tmax2 = params['tmax2'].value
-			
-			model = s1 * ((x**n1) * (np.e**((-n1*x)/tmax1))) + s2 * ((x**n2) * (np.e**((-n2*x)/tmax2)))
-			
-			return model - data
-			
-		# create data to be fitted
-		x = np.linspace(0,interval,len(self.blink_response))
-		
-		# # create a set of Parameters
-		# params = Parameters()
-		# params.add('a1', value=-1, min=-np.inf, max=-1e-25)
-		# params.add('a2', value=0.4, min=1e-25, max=np.inf)
-		# params.add('sh1', value=8, min=4, max=10)
-		# params.add('sh2', value=15,) #min=10, max=20)
-		# params.add('sc1', value=0.1, min=0, max=1)
-		# params.add('sc2', value=0.2, min=0, max=3)
-		#
-		# # do fit, here with leastsq model
-		# data = self.blink_response
-		# blink_result = minimize(double_gamma_ls, params, args=(x, data))
-		# self.blink_fit = double_gamma(blink_result.values, x)
-		#
-		# data = self.sac_response
-		# sac_result = minimize(double_gamma_ls, params, args=(x, data))
-		# self.sac_fit = double_gamma(sac_result.values, x)
-		#
-		# # upsample:
-		# x = np.linspace(0,interval,interval*self.sample_rate)
-		# blink_kernel = double_gamma(blink_result.values, x)
-		# sac_kernel = double_gamma(sac_result.values, x)
-		
-		# create a set of Parameters
-		params = Parameters()
-		params.add('s1', value=-1, min=-np.inf, max=-1e-25)
-		params.add('s2', value=1, min=1e-25, max=np.inf)
-		params.add('n1', value=10, min=9, max=11)
-		params.add('n2', value=10, min=8, max=12)
-		params.add('tmax1', value=0.9, min=0.5, max=1.5)
-		params.add('tmax2', value=2.5, min=1.5, max=4)
-
-		# do fit, here with powell method:
-		data = self.blink_response
-		blink_result = minimize(double_pupil_IRF_ls, params, method='powell', args=(x, data))
-		self.blink_fit = double_pupil_IRF(blink_result.values, x)
-		data = self.sac_response
-		sac_result = minimize(double_pupil_IRF_ls, params, method='powell', args=(x, data))
-		self.sac_fit = double_pupil_IRF(sac_result.values, x)
-		
-		# upsample:
-		x = np.linspace(0,interval,interval*self.sample_rate)
-		blink_kernel = double_pupil_IRF(blink_result.values, x)
-		sac_kernel = double_pupil_IRF(sac_result.values, x)
-		
+	
 		# use standard values:
-		# standard_values = {'a1':-0.604, 'sh1':8.337, 'sc1':0.115, 'a2':0.419, 'sh2':15.433, 'sc2':0.178}
-		# blink_kernel = double_gamma(standard_values, x)
-		# sac_kernel = double_gamma(standard_values, x)
-		
+		standard_values = {'a1':-0.604, 'sh1':8.337, 'sc1':0.115, 'a2':0.419, 'sh2':15.433, 'sc2':0.178}
+		blink_kernel = double_gamma(standard_values, x)
+		sac_kernel = double_gamma(standard_values, x)
+				
+
+		# regressors:
+		blink_reg = np.zeros(len(pupil))
+		blink_reg[blink_ends] = 1
+		blink_reg_conv = sp.signal.fftconvolve(blink_reg, blink_kernel, 'full')[:-(len(blink_kernel)-1)]
+		sac_reg = np.zeros(len(pupil))
+		sac_reg[blink_ends] = 1
+		sac_reg_conv = sp.signal.fftconvolve(sac_reg, sac_kernel, 'full')[:-(len(sac_kernel)-1)]
+		regs = [blink_reg_conv, sac_reg_conv]
+
+		# GLM:
+		design_matrix = np.matrix(np.vstack([reg for reg in regs])).T
+		betas = np.array(((design_matrix.T * design_matrix).I * design_matrix.T) * np.matrix(pupil_interpolated_bp).T).ravel()
+		explained = np.sum(np.vstack([betas[i]*regs[i] for i in range(len(betas))]), axis=0)
+
+		# clean pupil:
+		pupil_clean_bp = pupil_interpolated_bp - explained
+
+
 		# regress out from original timeseries with GLM:
 		event_1 = np.ones((len(blinks),3))
 		event_1[:,0] = blinks
