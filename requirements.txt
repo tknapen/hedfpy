@@ -4,7 +4,6 @@ scikit-learn==0.16.1
 scipy==0.16.0
 statsmodels==0.5.0
 tables==3.2.2
-sympy==0.7.6.1
 ipython==4.0.1
 lmfit==0.9.2
 fir==0.0.dev10
