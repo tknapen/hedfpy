@@ -215,10 +215,6 @@ class HDFEyeOperator(Operator):
 				#
 				for eye in blocks_data_frame.eye_recorded[i]: # this is a string with one or two letters, 'L', 'R' or 'LR'
 				# create dictionary of data per block:
-					# gazeXY = bdf[[s%'gaze' for s in [eye+'_%s_x', eye+'_%s_y',]]]
-					# pupil = bdf[[s%'pupil' for s in [eye+'_%s']]]
-					# eye_dict = {'timepoints':bdf.time, 'gazeXY':gazeXY, 'pupil':pupil,}
-					# shell()
 					gazeX = bdf[eye+'_gaze_x']
 					gazeY = bdf[eye+'_gaze_y']
 					pupil = bdf[eye+'_pupil']
@@ -241,21 +237,14 @@ class HDFEyeOperator(Operator):
 					# low-pass and band-pass pupil data:
 					eso.filter_pupil(hp=pupil_hp, lp=pupil_lp)
 
-					# z-score filtered pupil data:
-					eso.zscore_pupil()
-
 					# regress blink and saccade responses
 					eso.regress_blinks()
 
-
-					# percent signal change filtered pupil data:
-					eso.percent_signal_change_pupil(dtype='lp_filt_pupil')
-					eso.percent_signal_change_pupil(dtype='lp_filt_pupil_clean')
-					eso.percent_signal_change_pupil(dtype='bp_filt_pupil')
-					eso.percent_signal_change_pupil(dtype='bp_filt_pupil_clean')
-
-					# now dt the resulting pupil data:
-					eso.dt_pupil()
+					for dt in ['lp_filt_pupil','lp_filt_pupil_clean','bp_filt_pupil','bp_filt_pupil_clean']:
+						# percent signal change filtered pupil data:
+						eso.percent_signal_change_pupil(dtype=dt)
+						eso.zscore_pupil(dtype=dt)
+						eso.dt_pupil(dtype=dt)
 					
 					# add to existing dataframe:
 					bdf[eye+'_pupil_int'] = eso.interpolated_pupil
@@ -276,9 +265,11 @@ class HDFEyeOperator(Operator):
 					# blink/saccade regressed versions
 					bdf[eye+'_pupil_lp_clean'] = eso.lp_filt_pupil_clean
 					bdf[eye+'_pupil_lp_clean_psc'] = eso.lp_filt_pupil_clean_psc
+					bdf[eye+'_pupil_lp_clean_zscore'] = eso.lp_filt_pupil_clean_zscore
 					bdf[eye+'_pupil_bp_clean'] = eso.bp_filt_pupil_clean
 					bdf[eye+'_pupil_bp_clean_psc'] = eso.bp_filt_pupil_clean_psc
-					
+					bdf[eye+'_pupil_bp_clean_zscore'] = eso.bp_filt_pupil_clean_zscore
+				
 					# plot interpolated pupil time series:
 					fig = pl.figure(figsize = (16, 2.5))
 					x = np.linspace(0,eso.raw_pupil.shape[0]/sample_rate, eso.raw_pupil.shape[0])
