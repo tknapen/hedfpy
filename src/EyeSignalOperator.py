@@ -27,9 +27,6 @@ from lmfit import minimize, Parameters, Parameter, report_fit
 
 from Operator import Operator
 
-import functions_jw_GLM
-import functions_jw as myfuncs
-
 import fir
 
 from IPython import embed as shell
@@ -501,7 +498,7 @@ class EyeSignalOperator(Operator):
 		"""
 		
 		self.pupil_diff = (np.diff(self.interpolated_pupil) - np.diff(self.interpolated_pupil).mean()) / np.diff(self.interpolated_pupil).std()
-		self.peaks = myfuncs.detect_peaks(self.pupil_diff, mph=10, mpd=500, threshold=None, edge='rising', kpsh=False, valley=False, show=False, ax=False)[:-1] # last peak might not reflect blink...
+		self.peaks = detect_peaks(self.pupil_diff, mph=10, mpd=500, threshold=None, edge='rising', kpsh=False, valley=False, show=False, ax=False)[:-1] # last peak might not reflect blink...
 		if self.peaks != None:
 			points_for_interpolation = np.array([self.peaks, self.peaks], dtype=int).T + np.array(lin_interpolation_points).T
 			for itp in points_for_interpolation:
