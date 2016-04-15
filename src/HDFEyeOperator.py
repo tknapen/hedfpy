@@ -266,14 +266,11 @@ class HDFEyeOperator(Operator):
 					bdf[eye+'_pupil_lp_clean'] = eso.lp_filt_pupil_clean
 					bdf[eye+'_pupil_lp_clean_psc'] = eso.lp_filt_pupil_clean_psc
 					bdf[eye+'_pupil_lp_clean_zscore'] = eso.lp_filt_pupil_clean_zscore
-					
+
 					bdf[eye+'_pupil_bp_clean'] = eso.bp_filt_pupil_clean
 					bdf[eye+'_pupil_bp_clean_psc'] = eso.bp_filt_pupil_clean_psc
 					bdf[eye+'_pupil_bp_clean_zscore'] = eso.bp_filt_pupil_clean_zscore
-				
 					bdf[eye+'_pupil_bp_clean_dt'] = eso.bp_filt_pupil_clean_dt
-					bdf[eye+'_pupil_bp_clean_psc_dt'] = eso.bp_filt_pupil_clean_psc_dt
-					bdf[eye+'_pupil_bp_clean_zscore_dt'] = eso.bp_filt_pupil_clean_zscore_dt
 				
 					# plot interpolated pupil time series:
 					fig = pl.figure(figsize = (16, 2.5))
