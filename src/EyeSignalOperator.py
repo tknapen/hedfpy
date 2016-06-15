@@ -387,10 +387,9 @@ class EyeSignalOperator(Operator):
 			self.sample_rate = 1000.0
 
 	
-	def interpolate_blinks(self, method='linear', lin_interpolation_points=[[-200],[200]], spline_interpolation_points=[[-0.15,-0.075], [0.075,0.15]], coalesce_period=500):
+	def interpolate_blinks(self, method='linear', lin_interpolation_points=[[-200],[200]], spline_interpolation_points=[[-0.15,-0.075], [0.075,0.15]], coalesce_period=500, threshold_level = 0.01):
 		"""
 		interpolate_blinks interpolates blink periods with method, which can be spline or linear.
-		Use after self.blink_detection_pupil().
 		spline_interpolation_points is a 2 by X list detailing the data points around the blinks
 		(in s offset from blink start and end) that should be used for fitting the interpolation spline.
 
@@ -419,7 +418,7 @@ class EyeSignalOperator(Operator):
 				if self.blink_starts[-1] > self.blink_ends[-1]:
 					self.blink_starts = self.blink_starts[:-1]
 			except:
-				shell()
+				print 'probably not enough blinks to do full checks in this recording'
 		
 		# we do not want to start or end with a 0:
 		import copy
