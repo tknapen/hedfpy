@@ -387,12 +387,16 @@ class EyeSignalOperator(Operator):
 			self.sample_rate = 1000.0
 
 	
-	def interpolate_blinks(self, method='linear', lin_interpolation_points=[[-200],[200]], spline_interpolation_points=[[-0.15,-0.075], [0.075,0.15]], coalesce_period=500):
+	def interpolate_blinks(self, method='linear', lin_interpolation_points=[[-200],[200]], spline_interpolation_points=[[-0.15,-0.075], [0.075,0.15]], coalesce_period=500, threshold_level = 0.01):
 		"""
 		interpolate_blinks interpolates blink periods with method, which can be spline or linear.
-		Use after self.blink_detection_pupil().
 		spline_interpolation_points is a 2 by X list detailing the data points around the blinks
 		(in s offset from blink start and end) that should be used for fitting the interpolation spline.
+
+		The coalesce_period and threshold_level arguments serve to coalesce closely spaced blinks, 
+		but only when eyelink-detected blinks are not provided. 
+		The interval within which blinks have to fall in order to be grouped together is defined 
+		by the coalesce_period, threshold_level determines the level at which data is regarded as 'missing data'.  
 
 		The results are stored in self.interpolated_pupil, self.interpolated_x and self.interpolated_y
 		without affecting the self.raw_... variables
@@ -401,14 +405,14 @@ class EyeSignalOperator(Operator):
 		"""
 		self.logger.info('Interpolating blinks using interpolate_blinks')
 		# set all missing data to 0:
-		self.raw_pupil[self.raw_pupil<1] = 0
+		self.raw_pupil[self.raw_pupil<threshold_level] = 0
 		
 		# blinks to work with -- preferably eyelink!
 		if hasattr(self, 'eyelink_blink_data'):
 			for i in range(len(self.blink_starts_EL)):
 				self.raw_pupil[self.blink_starts_EL[i]:self.blink_ends_EL[i]] = 0 # set all eyelink-identified blinks to 0:
 		else:
-			self.blinks_indices = pd.rolling_mean(np.array(self.raw_pupil < threshold_level, dtype = float), int(coalesce_period)) > 0
+			self.blinks_indices = pd.rolling_mean(np.array(self.raw_pupil == 0, dtype = float), int(coalesce_period)) > 0
 			self.blinks_indices = np.array(self.blinks_indices, dtype=int)
 			self.blink_starts = self.timepoints[:-1][np.diff(self.blinks_indices) == 1]
 			self.blink_ends = self.timepoints[:-1][np.diff(self.blinks_indices) == -1]
@@ -419,7 +423,7 @@ class EyeSignalOperator(Operator):
 				if self.blink_starts[-1] > self.blink_ends[-1]:
 					self.blink_starts = self.blink_starts[:-1]
 			except:
-				shell()
+				print 'probably not enough blinks to do full checks in this recording'
 		
 		# we do not want to start or end with a 0:
 		import copy
