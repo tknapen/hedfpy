@@ -28,7 +28,7 @@ def ExecCommandLine(cmdline):
 	finally:
 		tmpf.close()
 		if retcode > 0:
-			raise ValueError, 'Process: '+cmdline+' returned error code: '+str(retcode)
+			raise ValueError( 'Process: '+cmdline+' returned error code: '+str(retcode) )
 	return retcode
 
 class CommandLineOperator( Operator ):
