@@ -682,7 +682,7 @@ class EyeSignalOperator(Operator):
 
 		# we add x and y gaze position for foreshortening, and add intercept
 		regs = [blink_reg_conv, sac_reg_conv, interpolated_x_hp, interpolated_y_hp, np.ones(sac_reg_conv.shape[-1]) ]
-		print [r.shape for r in regs]
+		print([r.shape for r in regs])
 
 		# GLM:
 		design_matrix = np.matrix(np.vstack([reg for reg in regs])).T
