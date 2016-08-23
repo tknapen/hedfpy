@@ -423,7 +423,7 @@ class EyeSignalOperator(Operator):
 				if self.blink_starts[-1] > self.blink_ends[-1]:
 					self.blink_starts = self.blink_starts[:-1]
 			except:
-				print 'probably not enough blinks to do full checks in this recording'
+				print('probably not enough blinks to do full checks in this recording')
 		
 		# we do not want to start or end with a 0:
 		import copy
