@@ -33,14 +33,14 @@ class EDFOperator( Operator ):
 	def __init__(self, input_object, **kwargs):         
 		super(EDFOperator, self).__init__(input_object = input_object, **kwargs)         
 		if self.input_object.__class__.__name__ == 'str':             
-			self.inputFileName = self.input_object         
-			self.logger.info('started with '+os.path.split(self.inputFileName)[-1])
+			self.input_file_name = self.input_object         
+			self.logger.info('started with '+os.path.split(self.input_file_name)[-1])
 		
 		# ** DATE: Tue Feb  4 10:19:06 2014
 		if os.path.splitext(self.input_object)[-1] == '.edf':
-			self.inputFileName = self.input_object
+			self.input_file_name = self.input_object
 			# in Kwargs there's a variable that we can set to 
-			eac = EDF2ASCOperator(self.inputFileName)
+			eac = EDF2ASCOperator(self.input_file_name)
 			eac.configure()
 			self.message_file = eac.messageOutputFileName
 			self.gaze_file = eac.gazeOutputFileName
@@ -99,7 +99,7 @@ class EDFOperator( Operator ):
 		self.logger.info(self.header)
 		
 	
-	def identify_blocks(self, minimal_time_gap = 50.0, minimal_block_duration = 5e3):
+	def identify_blocks(self, minimal_time_gap = 50.0, minimal_block_duration = 30e3):
 		"""
 		identify separate recording blocks in eyelink file, where 'blocks' means periods between
 		startrecording and stoprecording
@@ -108,6 +108,8 @@ class EDFOperator( Operator ):
 		The message file is used to look at the recorded eyes and samplerate per discontinuous block.
 		The resulting internal variable is self.blocks, which is a dictionary that specifies the characteristics of each of the encountered blocks,
 		but not the sample data itself, which will remain accessable via self.gaze_file and is added to self.blocks later (see take_gaze_data_for_blocks).
+
+		Only blocks with a duration larger than minimal_block_duration (in ms) will be selected. 
 		"""
 		self.logger.info('identifying recording blocks from %s'%self.gaze_file)
 		# check whether the gaze data has been cleaned up
@@ -138,8 +140,9 @@ class EDFOperator( Operator ):
 		# select only blocks of a significant duration, assuming timestamps in ms
 		selected_block_indices = []
 		for i, b in enumerate(self.blocks):
-			self.logger.info('%f raw block duration, threshold %f' % (b['block_end_timestamp'] - b['block_start_timestamp'], minimal_block_duration))
-			if (b['block_end_timestamp'] - b['block_start_timestamp']) > minimal_block_duration:
+			minimal_block_duration_samples = minimal_block_duration * b['sample_rate'] / 1000.0
+			self.logger.info('%f raw block duration, threshold %f' % (b['block_end_timestamp'] - b['block_start_timestamp'], minimal_block_duration_samples))
+			if (b['block_end_timestamp'] - b['block_start_timestamp']) > minimal_block_duration_samples:
 				selected_block_indices.append(i)
 		# and perform selection
 		self.blocks = [self.blocks[i] for i in selected_block_indices]
@@ -255,7 +258,7 @@ class EDFOperator( Operator ):
 			# now adjust the trial type dictionary and convert into a numpy dtype
 			# self.trial_type_dictionary.append(('trial_phase_timestamps', np.float64, (self.nr_phase_starts.max(), 3)))
 		else:
-			self.logger.info('no trial or phase information in edf file %s'%self.inputFileName)
+			self.logger.info('no trial or phase information in edf file %s'%self.input_file_name)
 			self.nr_trials = 0
 		
 		#
@@ -308,8 +311,8 @@ class EDFOperator( Operator ):
 		
 		if len(parameters) > 0:		# there were parameters in the edf file
 			self.parameters = parameters
-			
-			ptd = [(k, np.float64) for k in np.unique(np.concatenate([k.keys() for k in self.parameters]))]
+			print([k.keys() for k in self.parameters])
+			ptd = [(k, np.float64) for k in set(self.parameters[0].keys())]
 			self.parameter_type_dictionary = np.dtype(ptd)
 		else: # we have to take the parameters from the output_dict pickle file of the same name as the edf file. 
 			self.logger.info('no parameter information in edf file')

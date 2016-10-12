@@ -34,18 +34,18 @@ def ExecCommandLine(cmdline):
 class CommandLineOperator( Operator ):
 	def __init__(self, input_object, cmd, **kwargs):
 		"""
-		CommandLineOperator can take a Nii file as input but will use only the variable inputFileName
+		CommandLineOperator can take a Nii file as input but will use only the variable input_file_name
 		"""
 		super(CommandLineOperator, self).__init__(input_object = input_object, **kwargs)
 
 		if self.input_object.__class__.__name__ == 'NiftiImage':
-			self.inputFileName = self.input_object.filename
-			self.logger.info(self.__repr__() + ' initialized with ' + os.path.split(self.inputFileName)[-1])
+			self.input_file_name = self.input_object.filename
+			self.logger.info(self.__repr__() + ' initialized with ' + os.path.split(self.input_file_name)[-1])
 		elif self.input_object.__class__.__name__ == 'str':
-			self.inputFileName = self.input_object
-			self.logger.info(self.__repr__() + ' initialized with file ' + os.path.split(self.inputFileName)[-1])
-			if not os.path.isfile(self.inputFileName):
-				self.logger.warning('inputFileName is not a file at initialization')
+			self.input_file_name = self.input_object
+			self.logger.info(self.__repr__() + ' initialized with file ' + os.path.split(self.input_file_name)[-1])
+			if not os.path.isfile(self.input_file_name):
+				self.logger.warning('input_file_name is not a file at initialization')
 		elif self.input_object.__class__.__name__ == 'list':
 			self.inputList = self.input_object
 			self.logger.info(self.__repr__() + ' initialized with files ' + str(self.inputList))
@@ -56,7 +56,7 @@ class CommandLineOperator( Operator ):
 		placeholder for configure
 		to be filled in by subclasses
 		"""
-		self.runcmd = self.cmd + ' ' + self.inputFileName
+		self.runcmd = self.cmd + ' ' + self.input_file_name
 
 	def execute(self, wait = True):
 		"""
@@ -90,19 +90,19 @@ class EDF2ASCOperator( CommandLineOperator ):
 		'execute' (as per CommandLineOperator behavior)
 		"""
 		if gazeOutputFileName == None:
-			self.gazeOutputFileName = os.path.splitext(self.inputFileName)[0] + '.gaz'
+			self.gazeOutputFileName = os.path.splitext(self.input_file_name)[0] + '.gaz'
 		else:
 			self.gazeOutputFileName = gazeOutputFileName
 		if messageOutputFileName == None:
-			self.messageOutputFileName = os.path.splitext(self.inputFileName)[0] + '.msg'
+			self.messageOutputFileName = os.path.splitext(self.input_file_name)[0] + '.msg'
 		else:
 			self.messageOutputFileName = messageOutputFileName
-		standardOutputFileName = os.path.splitext(self.inputFileName)[0] + '.asc'
+		standardOutputFileName = os.path.splitext(self.input_file_name)[0] + '.asc'
 
 		self.intermediatecmd = self.cmd
 		self.intermediatecmd += settings
 
-		self.gazcmd = self.intermediatecmd + '-s -miss 0.0001 -vel "'+self.inputFileName+'"; mv ' + '"' + standardOutputFileName.replace('|', '\|') + '" "' + self.gazeOutputFileName.replace('|', '\|') + '"'
-		self.msgcmd = self.intermediatecmd + '-e "'+self.inputFileName+'"; mv ' + '"' + standardOutputFileName.replace('|', '\|') + '" "' + self.messageOutputFileName.replace('|', '\|') + '"'
+		self.gazcmd = self.intermediatecmd + '-s -miss 0.0001 -vel "'+self.input_file_name+'"; mv ' + '"' + standardOutputFileName.replace('|', '\|') + '" "' + self.gazeOutputFileName.replace('|', '\|') + '"'
+		self.msgcmd = self.intermediatecmd + '-e "'+self.input_file_name+'"; mv ' + '"' + standardOutputFileName.replace('|', '\|') + '" "' + self.messageOutputFileName.replace('|', '\|') + '"'
 
 		self.runcmd = self.gazcmd + '; ' + self.msgcmd

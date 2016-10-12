@@ -72,9 +72,9 @@ class HDFEyeOperator(Operator):
 		add_table_to_hdf adds a data table to the hdf file
 		"""
 		if filename == []:
-			filename = self.edf_operator.inputFileName
+			filename = self.edf_operator.input_file_name
 			
-		this_table = self.h5f.create_table(run_group, name, type_dict, '%s in file %s' % (name, self.edf_operator.inputFileName))
+		this_table = self.h5f.create_table(run_group, name, type_dict, '%s in file %s' % (name, self.edf_operator.input_file_name))
 		
 		row = this_table.row
 		for r in data:
@@ -103,10 +103,10 @@ class HDFEyeOperator(Operator):
 			self.add_edf_file(edf_file_name = alias)
 		
 		if alias == None:
-			alias = os.path.split(self.edf_operator.inputFileName)[-1]
+			alias = os.path.split(self.edf_operator.input_file_name)[-1]
 		self.open_hdf_file( mode = mode )
-		self.logger.info('Adding message data from %s to group  %s to %s' % (os.path.split(self.edf_operator.inputFileName)[-1], alias, self.input_object))
-		thisRunGroup = self.h5f.create_group("/", alias, 'Run ' + alias +' imported from ' + self.edf_operator.inputFileName)
+		self.logger.info('Adding message data from %s to group  %s to %s' % (os.path.split(self.edf_operator.input_file_name)[-1], alias, self.input_object))
+		thisRunGroup = self.h5f.create_group("/", alias, 'Run ' + alias +' imported from ' + self.edf_operator.input_file_name)
 		
 		#
 		#	trials and trial phases
@@ -192,8 +192,8 @@ class HDFEyeOperator(Operator):
 			self.add_edf_file(edf_file_name = alias)
 		
 		if alias == None:
-			alias = os.path.split(self.edf_operator.inputFileName)[-1]
-		self.logger.info('Adding gaze data from %s to group  %s to %s' % (os.path.split(self.edf_operator.inputFileName)[-1], alias, self.input_object))
+			alias = os.path.split(self.edf_operator.input_file_name)[-1]
+		self.logger.info('Adding gaze data from %s to group  %s to %s' % (os.path.split(self.edf_operator.input_file_name)[-1], alias, self.input_object))
 		
 		#
 		#	gaze data in blocks
