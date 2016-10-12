@@ -325,11 +325,6 @@ def detect_peaks(x, mph=None, mpd=1, threshold=0, edge='rising', kpsh=False, val
 
 def _plot(x, mph, mpd, threshold, edge, valley, ax, ind):
 	"""Plot results of the detect_peaks function, see its help."""
-	# try:
-	# 	import matplotlib.pyplot as plt
-	# except ImportError:
-	# 	print('matplotlib is not available.')
-	# else:
 	if ax is None:
 		_, ax = pl.subplots(1, 1, figsize=(8, 4))
 
@@ -349,9 +344,6 @@ def _plot(x, mph, mpd, threshold, edge, valley, ax, ind):
 	mode = 'Valley detection' if valley else 'Peak detection'
 	ax.set_title("%s (mph=%s, mpd=%d, threshold=%s, edge='%s')"
 				 % (mode, str(mph), mpd, str(threshold), edge))
-	# plt.grid()
-	# plt.show()
-
 
 class EyeSignalOperator(Operator):
 	"""
@@ -374,9 +366,11 @@ class EyeSignalOperator(Operator):
 		self.raw_pupil = np.array(self.input_object['pupil']).squeeze()
 		
 		if hasattr(self, 'eyelink_blink_data'):
+			# internalize all blinks smaller than 4 seconds, since these are missing signals to be treated differently
 			self.blink_dur_EL = np.array(self.eyelink_blink_data['duration']) 
 			self.blink_starts_EL = np.array(self.eyelink_blink_data['start_timestamp'])[self.blink_dur_EL<4000] - self.timepoints[0]
 			self.blink_ends_EL = np.array(self.eyelink_blink_data['end_timestamp'])[self.blink_dur_EL<4000] - self.timepoints[0]
+			self.blink_dur_EL = np.array(self.eyelink_blink_data['duration'])[self.blink_dur_EL<4000]		
 		
 		if hasattr(self, 'eyelink_sac_data'):
 			self.sac_dur_EL = np.array(self.eyelink_sac_data['duration']) 
