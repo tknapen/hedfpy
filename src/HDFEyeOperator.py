@@ -285,8 +285,8 @@ class HDFEyeOperator(Operator):
                     
                     # save summary plot:
                     fig = eso.summary_plot()
-                    fig.savefig(os.path.join(os.path.split(self.input_object)[0], 'pupil_preprocess_detection_{}_{}_{}.pdf'.format(alias, i, eye)))
-
+                    fig.savefig(os.path.join(os.path.split(self.input_object)[0], 'preprocess_{}_{}_{}.pdf'.format(alias, i, eye)))
+                    
                     # try time-frequency decomposition of the baseline signal
                     try:
                         eso.time_frequency_decomposition_pupil(
