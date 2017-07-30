@@ -28,14 +28,14 @@ def preprocess_subjects(subjects, task, output_dir, analysis_params):
         edfs = glob.glob(os.path.join(raw_dir, '{}*{}*.edf'.format(subject, task)))
         
         # folder hierarchy:
-        output_dir = os.path.join(output_dir, task, subject)
+        preprocess_dir = os.path.join(output_dir, task, subject)
         try:
-            os.makedirs(os.path.join(output_dir, 'raw'))
+            os.makedirs(os.path.join(preprocess_dir, 'raw'))
         except OSError:
             pass
     
         # hdf5 filename:
-        hdf5_filename = os.path.join(output_dir, '{}_{}.hdf5'.format(subject, task))
+        hdf5_filename = os.path.join(preprocess_dir, '{}_{}.hdf5'.format(subject, task))
         try:
             os.remove(hdf5_filename)
         except OSError:
@@ -53,8 +53,8 @@ def preprocess_subjects(subjects, task, output_dir, analysis_params):
     
         # preprocessing:
         for edf_file, alias in zip(edfs, aliases):
-            os.system('cp "' + edf_file + '" "' + os.path.join(output_dir, 'raw', alias + '.edf"'))
-            ho.add_edf_file(os.path.join(output_dir, 'raw', alias + '.edf'))
+            os.system('cp "' + edf_file + '" "' + os.path.join(preprocess_dir, 'raw', alias + '.edf"'))
+            ho.add_edf_file(os.path.join(preprocess_dir, 'raw', alias + '.edf'))
             ho.edf_message_data_to_hdf(alias=alias)
             ho.edf_gaze_data_to_hdf(alias=alias,
                                     pupil_hp=analysis_params['hp'],
