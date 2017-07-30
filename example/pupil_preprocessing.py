@@ -10,12 +10,12 @@ task = 'yesno'
 raw_dir = 'raw/'
 output_dir = os.path.expanduser('~/Downloads/pupil_prep/')
 analysis_params = {
-                'hp' : 6.0,
-                'lp' : 0.01,
+                'lp' : 6.0,
+                'hp' : 0.01,
                 'normalization' : 'psc',
                 }
 subjects = [
-            'sub-01',
+            # 'sub-01',
             'sub-02',
             ]
 
@@ -57,8 +57,8 @@ def preprocess_subjects(subjects, task, output_dir, analysis_params):
             ho.add_edf_file(os.path.join(preprocess_dir, 'raw', alias + '.edf'))
             ho.edf_message_data_to_hdf(alias=alias)
             ho.edf_gaze_data_to_hdf(alias=alias,
-                                    pupil_hp=analysis_params['hp'],
                                     pupil_lp=analysis_params['lp'],
+                                    pupil_hp=analysis_params['hp'],
                                     normalization=analysis_params['normalization']
                                     )
 

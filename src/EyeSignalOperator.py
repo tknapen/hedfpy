@@ -537,7 +537,7 @@ class EyeSignalOperator(Operator):
                 self.interpolated_y[itp[0]:itp[-1]] = np.linspace(self.interpolated_y[itp[0]], self.interpolated_y[itp[-1]], itp[-1]-itp[0])
                 self.interpolated_time_points[itp[0]:itp[-1]] = 1
                      
-    def filter_pupil(self, hp = 0.01, lp = 10.0):
+    def filter_pupil(self, hp=0.01, lp=10.0):
         """
         band_pass_filter_pupil band pass filters the pupil signal using a butterworth filter of order 3. 
         
@@ -667,6 +667,8 @@ class EyeSignalOperator(Operator):
         sacs = sacs[sacs<((self.timepoints[-1]-self.timepoints[0]))-interval]
         sacs = sacs.astype(int)
         
+        # shell()
+        
         def double_gamma(params, x): 
             a1 = params['a1']
             sh1 = params['sh1']
@@ -723,13 +725,13 @@ class EyeSignalOperator(Operator):
         import matplotlib.gridspec as gridspec
         
         fig = plt.figure(figsize=(6,10))
-        gs = gridspec.GridSpec(5, 4)
+        gs = gridspec.GridSpec(4, 2)
         ax1 = plt.subplot(gs[0,:])
         ax2 = plt.subplot(gs[1,:])
-        ax3 = plt.subplot(gs[2,0:2])
-        ax4 = plt.subplot(gs[2,2:4])
+        ax3 = plt.subplot(gs[2,0:1])
+        ax4 = plt.subplot(gs[2,1:2])
         ax5 = plt.subplot(gs[3,:])
-        ax6 = plt.subplot(gs[4,:])
+        # ax6 = plt.subplot(gs[4,:])
         
         x = np.linspace(0,self.raw_pupil.shape[0]/self.sample_rate, self.raw_pupil.shape[0])
         ax1.plot(x, self.raw_pupil, 'b', rasterized=True)
@@ -761,23 +763,24 @@ class EyeSignalOperator(Operator):
         ax4.set_xlabel('Time (s)')
         ax4.set_ylabel('Pupil size (raw)')
 
-        try:
-            x = np.linspace(0,self.raw_pupil.shape[0]/self.sample_rate, self.raw_pupil.shape[0])
-            ax5.plot(x, self.GLM_measured, 'b', rasterized=True)
-            ax5.plot(x, self.GLM_predicted, lw=2, color='g', rasterized=True)
-            ax5.set_title('Nuisance GLM -- R2={}, p={}'.format(round(self.GLM_r,4), round(self.GLM_p,4)))
-            ax5.set_ylabel('Pupil size (raw)')
-            ax5.set_xlabel('Time (s)')
-            ax5.legend(['measured', 'predicted'])
-        except:
-            pass
+        # try:
+        #     x = np.linspace(0,self.raw_pupil.shape[0]/self.sample_rate, self.raw_pupil.shape[0])
+        #     ax5.plot(x, self.GLM_measured, 'b', rasterized=True)
+        #     ax5.plot(x, self.GLM_predicted, lw=2, color='g', rasterized=True)
+        #     ax5.set_title('Nuisance GLM -- R2={}, p={}'.format(round(self.GLM_r,4), round(self.GLM_p,4)))
+        #     ax5.set_ylabel('Pupil size (raw)')
+        #     ax5.set_xlabel('Time (s)')
+        #     ax5.legend(['measured', 'predicted'])
+        # except:
+        #     pass
         
-        ax6.plot(x, self.lp_filt_pupil_psc, 'b', rasterized=True)
-        ax6.plot(x, self.lp_filt_pupil_clean_psc, 'g', rasterized=True)
-        ax6.set_title('Final timeseries')
-        ax6.set_ylabel('Pupil size (% signal change)')
-        ax6.set_xlabel('Time (s)')
-        ax6.legend(['low pass', 'low pass + cleaned up'])
+        x = np.linspace(0,self.raw_pupil.shape[0]/self.sample_rate, self.raw_pupil.shape[0])
+        ax5.plot(x, self.lp_filt_pupil, 'b', rasterized=True)
+        ax5.plot(x, self.lp_filt_pupil_clean, 'g', rasterized=True)
+        ax5.set_title('Final timeseries')
+        ax5.set_ylabel('Pupil size (% signal change)')
+        ax5.set_xlabel('Time (s)')
+        ax5.legend(['low pass', 'low pass + cleaned up'])
         
         plt.tight_layout()
         
