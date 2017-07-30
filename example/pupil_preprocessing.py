@@ -16,7 +16,7 @@ analysis_params = {
                 }
 subjects = [
             'sub-01',
-            # 'sub-02',
+            'sub-02',
             ]
 
 def preprocess_subjects(subjects, task, output_dir, analysis_params):
