@@ -155,6 +155,7 @@ class HDFEyeOperator(Operator):
             pupil_hp = 0.01, 
             pupil_lp = 6,
             sample_rate = 1000.,
+            normalization = 'psc',
             minimal_frequency_filterbank = 0.0025, 
             maximal_frequency_filterbank = 0.1, 
             nr_freq_bins_filterbank = 9, 
@@ -237,27 +238,16 @@ class HDFEyeOperator(Operator):
                     # low-pass and band-pass pupil data:
                     eso.filter_pupil(hp=pupil_hp, lp=pupil_lp)
                     
-                    # now dt the resulting pupil data:
-                    eso.dt_pupil(dtype='lp_filt_pupil')
-                    eso.dt_pupil(dtype='bp_filt_pupil')
+                    # # now dt the resulting pupil data:
+                    # eso.dt_pupil(dtype='lp_filt_pupil')
+                    # eso.dt_pupil(dtype='bp_filt_pupil')
                     
                     # regress blink and saccade responses
-                    try:
-                        eso.regress_blinks()
-                    except:
-                        eso.lp_filt_pupil_clean = eso.lp_filt_pupil.copy()
-                        eso.bp_filt_pupil_clean = eso.bp_filt_pupil.copy()
-
-                    # zscore filtered pupil data:
-                    eso.zscore_pupil(dtype='lp_filt_pupil')
-                    eso.zscore_pupil(dtype='lp_filt_pupil_clean')
-                    eso.zscore_pupil(dtype='bp_filt_pupil')
-                    eso.zscore_pupil(dtype='bp_filt_pupil_clean')
-                    # percent signal change filtered pupil data:
-                    eso.percent_signal_change_pupil(dtype='lp_filt_pupil')
-                    eso.percent_signal_change_pupil(dtype='lp_filt_pupil_clean')
-                    eso.percent_signal_change_pupil(dtype='bp_filt_pupil')
-                    eso.percent_signal_change_pupil(dtype='bp_filt_pupil_clean')
+                    # try:
+                    eso.regress_blinks()
+                    # except:
+                    #     eso.lp_filt_pupil_clean = eso.lp_filt_pupil.copy()
+                    #     eso.bp_filt_pupil_clean = eso.bp_filt_pupil.copy()
                     
                     # add to existing dataframe:
                     bdf[eye+'_interpolated_timepoints'] = eso.interpolated_time_points
@@ -268,21 +258,33 @@ class HDFEyeOperator(Operator):
                     bdf[eye+'_gaze_y_int'] = eso.interpolated_y
                     
                     bdf[eye+'_pupil_lp'] = eso.lp_filt_pupil
-                    bdf[eye+'_pupil_lp_dt'] = eso.lp_filt_pupil_dt
-                    bdf[eye+'_pupil_lp_zscore'] = eso.lp_filt_pupil_zscore
-                    bdf[eye+'_pupil_lp_psc'] = eso.lp_filt_pupil_psc
+                    # bdf[eye+'_pupil_lp_dt'] = eso.lp_filt_pupil_dt
                     bdf[eye+'_pupil_lp_clean'] = eso.lp_filt_pupil_clean
-                    bdf[eye+'_pupil_lp_clean_zscore'] = eso.lp_filt_pupil_clean_zscore
-                    bdf[eye+'_pupil_lp_clean_psc'] = eso.lp_filt_pupil_clean_psc
                     
                     bdf[eye+'_pupil_bp'] = eso.bp_filt_pupil
-                    bdf[eye+'_pupil_bp_dt'] = eso.bp_filt_pupil_dt
-                    bdf[eye+'_pupil_bp_zscore'] = eso.bp_filt_pupil_zscore
-                    bdf[eye+'_pupil_bp_psc'] = eso.bp_filt_pupil_psc
+                    # bdf[eye+'_pupil_bp_dt'] = eso.bp_filt_pupil_dt
                     bdf[eye+'_pupil_bp_clean'] = eso.bp_filt_pupil_clean
-                    bdf[eye+'_pupil_bp_clean_zscore'] = eso.bp_filt_pupil_clean_zscore
-                    bdf[eye+'_pupil_bp_clean_psc'] = eso.bp_filt_pupil_clean_psc
                     
+                    # add normalized timeseries:
+                    if normalization == 'zcore':
+                        eso.zscore_pupil(dtype='lp_filt_pupil')
+                        eso.zscore_pupil(dtype='lp_filt_pupil_clean')
+                        eso.zscore_pupil(dtype='bp_filt_pupil')
+                        eso.zscore_pupil(dtype='bp_filt_pupil_clean')
+                        bdf[eye+'_pupil_lp_zscore'] = eso.lp_filt_pupil_zscore
+                        bdf[eye+'_pupil_lp_clean_zscore'] = eso.lp_filt_pupil_clean_zscore
+                        bdf[eye+'_pupil_bp_zscore'] = eso.bp_filt_pupil_zscore
+                        bdf[eye+'_pupil_bp_clean_zscore'] = eso.bp_filt_pupil_clean_zscore
+                    if normalization == 'psc':
+                        eso.percent_signal_change_pupil(dtype='lp_filt_pupil')
+                        eso.percent_signal_change_pupil(dtype='lp_filt_pupil_clean')
+                        eso.percent_signal_change_pupil(dtype='bp_filt_pupil')
+                        eso.percent_signal_change_pupil(dtype='bp_filt_pupil_clean')
+                        bdf[eye+'_pupil_lp_psc'] = eso.lp_filt_pupil_psc
+                        bdf[eye+'_pupil_lp_clean_psc'] = eso.lp_filt_pupil_clean_psc
+                        bdf[eye+'_pupil_bp_psc'] = eso.bp_filt_pupil_psc
+                        bdf[eye+'_pupil_bp_clean_psc'] = eso.bp_filt_pupil_clean_psc
+                        
                     # save summary plot:
                     fig = eso.summary_plot()
                     fig.savefig(os.path.join(os.path.split(self.input_object)[0], 'preprocess_{}_{}_{}.pdf'.format(alias, i, eye)))
