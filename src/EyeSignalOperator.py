@@ -733,12 +733,12 @@ class EyeSignalOperator(Operator):
         ax5 = plt.subplot(gs[3,:])
         # ax6 = plt.subplot(gs[4,:])
         
-        x = np.linspace(0,self.raw_pupil.shape[0]/self.sample_rate, self.raw_pupil.shape[0])
+        x = np.linspace(0,self.raw_pupil.shape[0]/self.sample_rate, self.raw_pupil.shape[0]) / 60.0
         ax1.plot(x, self.raw_pupil, 'b', rasterized=True)
         ax1.plot(x, self.interpolated_pupil, 'g', rasterized=True)
         ax1.set_title('Raw and blink interpolated timeseries')
         ax1.set_ylabel('Pupil size (raw)')
-        ax1.set_xlabel('Time (s)')
+        ax1.set_xlabel('Time (min)')
         ax1.legend(['Raw', 'Int + filt'])
         
         ax2.plot(self.pupil_diff, rasterized=True)
@@ -762,24 +762,13 @@ class EyeSignalOperator(Operator):
         ax4.set_title('Saccade response')
         ax4.set_xlabel('Time (s)')
         ax4.set_ylabel('Pupil size (raw)')
-
-        # try:
-        #     x = np.linspace(0,self.raw_pupil.shape[0]/self.sample_rate, self.raw_pupil.shape[0])
-        #     ax5.plot(x, self.GLM_measured, 'b', rasterized=True)
-        #     ax5.plot(x, self.GLM_predicted, lw=2, color='g', rasterized=True)
-        #     ax5.set_title('Nuisance GLM -- R2={}, p={}'.format(round(self.GLM_r,4), round(self.GLM_p,4)))
-        #     ax5.set_ylabel('Pupil size (raw)')
-        #     ax5.set_xlabel('Time (s)')
-        #     ax5.legend(['measured', 'predicted'])
-        # except:
-        #     pass
         
-        x = np.linspace(0,self.raw_pupil.shape[0]/self.sample_rate, self.raw_pupil.shape[0])
+        x = np.linspace(0,self.raw_pupil.shape[0]/self.sample_rate, self.raw_pupil.shape[0]) / 60.0
         ax5.plot(x, self.lp_filt_pupil, 'b', rasterized=True)
         ax5.plot(x, self.lp_filt_pupil_clean, 'g', rasterized=True)
         ax5.set_title('Final timeseries')
-        ax5.set_ylabel('Pupil size (% signal change)')
-        ax5.set_xlabel('Time (s)')
+        ax5.set_ylabel('Pupil size (raw)')
+        ax5.set_xlabel('Time (min)')
         ax5.legend(['low pass', 'low pass + cleaned up'])
         
         plt.tight_layout()
