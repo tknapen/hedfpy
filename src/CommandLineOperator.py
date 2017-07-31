@@ -100,7 +100,7 @@ class EDF2ASCOperator( CommandLineOperator ):
         self.intermediatecmd = self.cmd
         self.intermediatecmd += settings
         
-        if sys.platform.startswith('win')
+        if sys.platform.startswith('win'):
             self.gazcmd = self.intermediatecmd + '-s -miss 0.0001 -vel "'+self.input_file_name+'"; move ' + '"' + standardOutputFileName.replace('|', '\|') + '" "' + self.gazeOutputFileName.replace('|', '\|') + '"'
             self.msgcmd = self.intermediatecmd + '-e "'+self.input_file_name+'"; move ' + '"' + standardOutputFileName.replace('|', '\|') + '" "' + self.messageOutputFileName.replace('|', '\|') + '"'
         else:
