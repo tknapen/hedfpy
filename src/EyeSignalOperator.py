@@ -22,12 +22,11 @@ from math import *
 from scipy.signal import butter, lfilter, filtfilt, fftconvolve, resample
 import scipy.interpolate as interpolate
 import scipy.stats as stats
-import mne
-from lmfit import minimize, Parameters, Parameter, report_fit
+# from lmfit import minimize, Parameters, Parameter, report_fit
 
 from Operator import Operator
 
-import fir
+# import fir
 
 from IPython import embed as shell
 
@@ -53,6 +52,15 @@ def _butter_bandpass(data, lowcut, highcut, fs, order=5):
     b, a = sp.signal.butter(order, high, btype='lowpass')
     y = sp.signal.filtfilt(b, a, data_hp)
     return y
+
+def _double_gamma(params, x): 
+    a1 = params['a1']
+    sh1 = params['sh1']
+    sc1 = params['sc1']
+    a2 = params['a2']
+    sh2 = params['sh2']
+    sc2 = params['sc2']
+    return a1 * sp.stats.gamma.pdf(x, sh1, loc=0.0, scale = sc1) + a2 * sp.stats.gamma.pdf(x, sh2, loc=0.0, scale=sc2)
     
 def detect_saccade_from_data(xy_data = None, vel_data = None, l = 5, sample_rate = 1000.0, minimum_saccade_duration = 0.0075):
     """Uses the engbert & mergenthaler algorithm (PNAS 2006) to detect saccades.
@@ -373,14 +381,14 @@ class EyeSignalOperator(Operator):
         if hasattr(self, 'eyelink_blink_data'):
             # internalize all blinks smaller than 4 seconds, since these are missing signals to be treated differently
             self.blink_dur_EL = np.array(self.eyelink_blink_data['duration']) 
-            self.blink_starts_EL = np.array(self.eyelink_blink_data['start_timestamp'])[self.blink_dur_EL<4000] - self.timepoints[0]
-            self.blink_ends_EL = np.array(self.eyelink_blink_data['end_timestamp'])[self.blink_dur_EL<4000] - self.timepoints[0]
-            self.blink_dur_EL = np.array(self.eyelink_blink_data['duration'])[self.blink_dur_EL<4000]        
+            self.blink_starts_EL = (np.array(self.eyelink_blink_data['start_timestamp'])[self.blink_dur_EL<4000] - self.timepoints[0]) / (1000.0 / self.sample_rate)
+            self.blink_ends_EL = (np.array(self.eyelink_blink_data['end_timestamp'])[self.blink_dur_EL<4000] - self.timepoints[0]) / (1000.0 / self.sample_rate)
+            self.blink_dur_EL = self.blink_ends_EL - self.blink_starts_EL
         
         if hasattr(self, 'eyelink_sac_data'):
             self.sac_dur_EL = np.array(self.eyelink_sac_data['duration']) 
-            self.sac_starts_EL = np.array(self.eyelink_sac_data['start_timestamp']) - self.timepoints[0]
-            self.sac_ends_EL = np.array(self.eyelink_sac_data['end_timestamp']) - self.timepoints[0]
+            self.sac_starts_EL = (np.array(self.eyelink_sac_data['start_timestamp']) - self.timepoints[0]) / (1000.0 / self.sample_rate)
+            self.sac_ends_EL = (np.array(self.eyelink_sac_data['end_timestamp']) - self.timepoints[0]) / (1000.0 / self.sample_rate)
         
         if not hasattr(self, 'sample_rate'): # this should have been set as a kwarg, but if it hasn't we just assume a standard 1000 Hz
             self.sample_rate = 1000.0
@@ -641,50 +649,36 @@ class EyeSignalOperator(Operator):
             print('you did not specify a tf-decomposition')
     
 
-    def regress_blinks(self, interval=7):
+    def regress_blinks(self, interval=7, regress_blinks=True, regress_sacs=True):
         """
         """
+        
         self.logger.info('Regressing blinks, saccades and gaze position of pupil signals')
+        
         # params:
-        
-        self.downsample_rate = 100
-        self.new_sample_rate = self.sample_rate / self.downsample_rate
-        
         x = np.linspace(0, interval, interval * self.sample_rate, endpoint=False)
         
-        # events:
+        # blink events:
         blinks = self.blink_ends
-        blinks = blinks[blinks>25]
+        blinks = blinks[blinks>20]
         blinks = blinks[blinks<((self.timepoints[-1]-self.timepoints[0]))-interval]
-        
         if blinks.size == 0:
             blinks = np.array([0], dtype = int)
         else:
             blinks = blinks.astype(int)
         
+        # sacs events:
         sacs = self.sac_ends_EL
-        sacs = sacs[sacs>25]
+        sacs = sacs[sacs>20]
         sacs = sacs[sacs<((self.timepoints[-1]-self.timepoints[0]))-interval]
         sacs = sacs.astype(int)
         
-        # shell()
-        
-        def double_gamma(params, x): 
-            a1 = params['a1']
-            sh1 = params['sh1']
-            sc1 = params['sc1']
-            a2 = params['a2']
-            sh2 = params['sh2']
-            sc2 = params['sc2']
-            return a1 * sp.stats.gamma.pdf(x, sh1, loc=0.0, scale = sc1) + a2 * sp.stats.gamma.pdf(x, sh2, loc=0.0, scale=sc2)
-    
         # use standard values:
         standard_blink_parameters = {'a1':-0.604, 'sh1':8.337, 'sc1':0.115, 'a2':0.419, 'sh2':15.433, 'sc2':0.178}
-        self.blink_kernel = double_gamma(standard_blink_parameters, x)
-
+        self.blink_kernel = _double_gamma(standard_blink_parameters, x)
         standard_sac_parameters = {'a1':-0.175, 'sh1': 6.451, 'sc1':0.178, 'a2':0.0, 'sh2': 1, 'sc2': 1}
-        self.sac_kernel = double_gamma(standard_sac_parameters, x)
-                
+        self.sac_kernel = _double_gamma(standard_sac_parameters, x)
+        
         # blink and saccade regressors:
         blink_reg = np.zeros(self.bp_filt_pupil.shape[0])
         blink_reg[blinks] = 1
@@ -692,17 +686,26 @@ class EyeSignalOperator(Operator):
         sac_reg = np.zeros(self.bp_filt_pupil.shape[0])
         sac_reg[sacs] = 1
         sac_reg_conv = sp.signal.fftconvolve(sac_reg, self.sac_kernel, 'full')[:-(len(self.sac_kernel)-1)]
-
+        
         # high-pass filter the eye position data to remove slow drifts
-        hp_cof_sample = 0.005 / (self.interpolated_x.shape[0] / self.sample_rate / 2)
-        bhp, ahp = sp.signal.butter(3, hp_cof_sample, btype='high')
-        interpolated_x_hp = sp.signal.filtfilt(bhp, ahp, self.interpolated_x)
-        interpolated_y_hp = sp.signal.filtfilt(bhp, ahp, self.interpolated_y)
-
+        interpolated_x_hp = self.interpolated_x.copy().astype('float64') - self.interpolated_x.mean()
+        interpolated_y_hp = self.interpolated_y.copy().astype('float64') - self.interpolated_y.mean()
+        interpolated_x_hp[0:int(5*self.sample_rate)] = 0
+        interpolated_y_hp[0:int(5*self.sample_rate)] = 0
+        interpolated_x_hp = _butter_highpass(data=interpolated_x_hp, lowcut=0.005, fs=self.sample_rate, order=3)
+        interpolated_y_hp = _butter_highpass(data=interpolated_y_hp, lowcut=0.005, fs=self.sample_rate, order=3)
+        
         # we add x and y gaze position for foreshortening, and add intercept
-        regs = [blink_reg_conv, sac_reg_conv, interpolated_x_hp, interpolated_y_hp, np.ones(sac_reg_conv.shape[-1]) ]
+        if regress_blinks & regress_sacs:
+            regs = [blink_reg_conv, sac_reg_conv, interpolated_x_hp, interpolated_y_hp, np.ones(sac_reg_conv.shape[-1]) ]
+        elif regress_blinks:
+            regs = [blink_reg_conv, interpolated_x_hp, interpolated_y_hp, np.ones(sac_reg_conv.shape[-1]) ]
+        elif regress_sacs:
+            regs = [sac_reg_conv, interpolated_x_hp, interpolated_y_hp, np.ones(sac_reg_conv.shape[-1]) ]
+        else:
+            regs = [interpolated_x_hp, interpolated_y_hp, np.ones(sac_reg_conv.shape[-1]) ]
         print([r.shape for r in regs])
-
+        
         # GLM:
         design_matrix = np.matrix(np.vstack([reg for reg in regs])).T
         betas = np.array(((design_matrix.T * design_matrix).I * design_matrix.T) * np.matrix(self.bp_filt_pupil).T).ravel()
@@ -710,9 +713,18 @@ class EyeSignalOperator(Operator):
         
         rsq = sp.stats.pearsonr(self.bp_filt_pupil, explained)
         self.logger.info('Nuisance GLM Results, pearsons R (p) is %1.3f (%1.4f)'%(rsq))
-        self.logger.info('Nuisance GLM Results, Blink, Saccade beta %3.3f, %3.3f)'%(betas[0], betas[1]))
-        self.logger.info('Nuisance GLM Results, Gaze x, y, intercept beta %3.3f, %3.3f, %3.3f )'%(betas[2], betas[3], betas[4]))
-
+        if regress_blinks & regress_sacs:
+            self.logger.info('Nuisance GLM Results, Blink, Saccade beta %3.3f, %3.3f)'%(betas[0], betas[1]))
+            self.logger.info('Nuisance GLM Results, Gaze x, y, intercept beta %3.3f, %3.3f, %3.3f )'%(betas[2], betas[3], betas[4]))
+        elif regress_blinks:
+            self.logger.info('Nuisance GLM Results, Blink beta %3.3f)'%(betas[0]))
+            self.logger.info('Nuisance GLM Results, Gaze x, y, intercept beta %3.3f, %3.3f, %3.3f )'%(betas[1], betas[2], betas[3]))
+        elif regress_sacs:
+            self.logger.info('Nuisance GLM Results, Saccade beta %3.3f)'%(betas[0]))
+            self.logger.info('Nuisance GLM Results, Gaze x, y, intercept beta %3.3f, %3.3f, %3.3f )'%(betas[1], betas[2], betas[3]))
+        else:
+            self.logger.info('Nuisance GLM Results, Gaze x, y, intercept beta %3.3f, %3.3f, %3.3f )'%(betas[0], betas[1], betas[2]))
+            
         # clean data are residuals:
         self.bp_filt_pupil_clean = self.bp_filt_pupil - explained
         
@@ -731,7 +743,6 @@ class EyeSignalOperator(Operator):
         ax3 = plt.subplot(gs[2,0:1])
         ax4 = plt.subplot(gs[2,1:2])
         ax5 = plt.subplot(gs[3,:])
-        # ax6 = plt.subplot(gs[4,:])
         
         x = np.linspace(0,self.raw_pupil.shape[0]/self.sample_rate, self.raw_pupil.shape[0]) / 60.0
         ax1.plot(x, self.raw_pupil, 'b', rasterized=True)
@@ -746,7 +757,7 @@ class EyeSignalOperator(Operator):
         ax2.set_ylim(ymin=-200, ymax=200)
         ax2.set_title('Remaining blinks?')
         ax2.set_ylabel('Diff pupil size (raw)')
-        ax2.set_xlabel('Samples')
+        ax1.set_xlabel('Time (min)')
         
         x = np.linspace(0,self.blink_kernel.shape[0]/self.sample_rate, self.blink_kernel.shape[0])
         # ax3.plot(x, self.blink_response, label='response')

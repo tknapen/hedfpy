@@ -156,6 +156,8 @@ class HDFEyeOperator(Operator):
             pupil_lp = 6,
             sample_rate = 1000.,
             normalization = 'psc',
+            regress_blinks = True,
+            regress_sacs = True,
             minimal_frequency_filterbank = 0.0025, 
             maximal_frequency_filterbank = 0.1, 
             nr_freq_bins_filterbank = 9, 
@@ -229,7 +231,7 @@ class HDFEyeOperator(Operator):
                         sac_dict[sac_dict['eye'] == eye]
                         eso = EyeSignalOperator(input_object=eye_dict, eyelink_blink_data=blink_dict, eyelink_sac_data=sac_dict, sample_rate=sample_rate,)
                     else:
-                        eso = EyeSignalOperator(input_object=eye_dict,sample_rate=sample_rate)
+                        eso = EyeSignalOperator(input_object=eye_dict, sample_rate=sample_rate)
     
                     # interpolate blinks:
                     eso.interpolate_blinks(method='linear')
@@ -244,7 +246,7 @@ class HDFEyeOperator(Operator):
                     
                     # regress blink and saccade responses
                     # try:
-                    eso.regress_blinks()
+                    eso.regress_blinks(regress_blinks=regress_blinks, regress_sacs=regress_blinks)
                     # except:
                     #     eso.lp_filt_pupil_clean = eso.lp_filt_pupil.copy()
                     #     eso.bp_filt_pupil_clean = eso.bp_filt_pupil.copy()
