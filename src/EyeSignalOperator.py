@@ -752,12 +752,12 @@ class EyeSignalOperator(Operator):
         ax1.set_xlabel('Time (min)')
         ax1.legend(['Raw', 'Int + filt'])
         
-        ax2.plot(self.pupil_diff, rasterized=True)
-        ax2.plot(self.peaks, self.pupil_diff[self.peaks], '+', mec='r', mew=2, ms=8, rasterized=True)
+        ax2.plot(x[1:], self.pupil_diff, rasterized=True)
+        ax2.plot(self.peaks/self.sample_rate/60.0, self.pupil_diff[self.peaks], '+', mec='r', mew=2, ms=8, rasterized=True)
         ax2.set_ylim(ymin=-200, ymax=200)
         ax2.set_title('Remaining blinks?')
         ax2.set_ylabel('Diff pupil size (raw)')
-        ax1.set_xlabel('Time (min)')
+        ax2.set_xlabel('Time (min)')
         
         x = np.linspace(0,self.blink_kernel.shape[0]/self.sample_rate, self.blink_kernel.shape[0])
         # ax3.plot(x, self.blink_response, label='response')
@@ -765,14 +765,14 @@ class EyeSignalOperator(Operator):
         ax3.legend()
         ax3.set_title('Blink response')
         ax3.set_xlabel('Time (s)')
-        ax3.set_ylabel('Pupil size (raw)')
+        ax3.set_ylabel('Pupil response (a.u.)')
         
         # ax4.plot(x, self.sac_response, label='response')
         ax4.plot(x, self.sac_kernel, label='fit')
         ax4.legend()
         ax4.set_title('Saccade response')
         ax4.set_xlabel('Time (s)')
-        ax4.set_ylabel('Pupil size (raw)')
+        ax4.set_ylabel('Pupil response (a.u.)')
         
         x = np.linspace(0,self.raw_pupil.shape[0]/self.sample_rate, self.raw_pupil.shape[0]) / 60.0
         ax5.plot(x, self.lp_filt_pupil, 'b', rasterized=True)

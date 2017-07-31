@@ -8,9 +8,9 @@ import hedfpy
 
 task = 'yesno'
 raw_dir = 'raw/'
-output_dir = os.path.expanduser('~/Downloads/pupil_prep/')
+output_dir = 'preprocessed/'
 analysis_params = {
-                'sample_rate' : 500.0,
+                'sample_rate' : 1000.0,
                 'lp' : 6.0,
                 'hp' : 0.01,
                 'normalization' : 'psc',
