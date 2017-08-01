@@ -101,9 +101,10 @@ class EDF2ASCOperator( CommandLineOperator ):
         self.intermediatecmd += settings
         
         if sys.platform.startswith('win'):
-            self.gazcmd = self.intermediatecmd + '-s -miss 0.0001 -vel "'+self.input_file_name+'"; move ' + '"' + standardOutputFileName.replace('|', '\|') + '" "' + self.gazeOutputFileName.replace('|', '\|') + '"'
-            self.msgcmd = self.intermediatecmd + '-e "'+self.input_file_name+'"; move ' + '"' + standardOutputFileName.replace('|', '\|') + '" "' + self.messageOutputFileName.replace('|', '\|') + '"'
+            self.gazcmd = self.intermediatecmd + '-s -miss 0.0001 -vel "{}" & move "{}" "{}"'.format(os.path.normpath(self.input_file_name), os.path.normpath(standardOutputFileName), os.path.normpath(self.gazeOutputFileName))
+            self.msgcmd = self.intermediatecmd + '-e "{}" & move "{}" "{}"'.format(os.path.normpath(self.input_file_name), os.path.normpath(standardOutputFileName), os.path.normpath(self.messageOutputFileName))
+            self.runcmd = self.gazcmd + ' && ' + self.msgcmd
         else:
             self.gazcmd = self.intermediatecmd + '-s -miss 0.0001 -vel "'+self.input_file_name+'"; mv ' + '"' + standardOutputFileName.replace('|', '\|') + '" "' + self.gazeOutputFileName.replace('|', '\|') + '"'
             self.msgcmd = self.intermediatecmd + '-e "'+self.input_file_name+'"; mv ' + '"' + standardOutputFileName.replace('|', '\|') + '" "' + self.messageOutputFileName.replace('|', '\|') + '"'
-        self.runcmd = self.gazcmd + '; ' + self.msgcmd
+            self.runcmd = self.gazcmd + '; ' + self.msgcmd
