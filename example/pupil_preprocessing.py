@@ -16,6 +16,7 @@ analysis_params = {
                 'normalization' : 'psc',
                 'regress_blinks' : True,
                 'regress_sacs' : True,
+                'use_standard_blinksac_kernels' : False,
                 }
 subjects = [
             'sub-01',
@@ -23,7 +24,6 @@ subjects = [
             ]
 
 def preprocess_subjects(subjects, task, output_dir, analysis_params):
-    """import_all_data loops across the aliases of the sessions and converts the respective edf files, adds them to the self.ho's hdf5 file. """
     
     for subject in subjects:
         
@@ -66,6 +66,7 @@ def preprocess_subjects(subjects, task, output_dir, analysis_params):
                                     normalization=analysis_params['normalization'],
                                     regress_blinks=analysis_params['regress_blinks'],
                                     regress_sacs=analysis_params['regress_sacs'],
+                                    use_standard_blinksac_kernels=analysis_params['use_standard_blinksac_kernels'],
                                     )
         
 def main():
