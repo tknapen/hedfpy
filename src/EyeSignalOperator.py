@@ -22,11 +22,9 @@ from math import *
 from scipy.signal import butter, lfilter, filtfilt, fftconvolve, resample
 import scipy.interpolate as interpolate
 import scipy.stats as stats
-# from lmfit import minimize, Parameters, Parameter, report_fit
+
 
 from Operator import Operator
-
-# import fir
 
 from IPython import embed as shell
 
@@ -61,6 +59,31 @@ def _double_gamma(params, x):
     sh2 = params['sh2']
     sc2 = params['sc2']
     return a1 * sp.stats.gamma.pdf(x, sh1, loc=0.0, scale = sc1) + a2 * sp.stats.gamma.pdf(x, sh2, loc=0.0, scale=sc2)
+
+def _pupil_IRF(params, x):
+    s1 = params['s1']
+    n1 = params['n1']
+    tmax1 = params['tmax1']
+    return s1 * (x**n1) * (np.e**((-n1*x)/tmax1))
+    
+def _double_pupil_IRF(params, x):
+    s1 = params['s1']
+    s2 = params['s2']
+    n1 = params['n1']
+    n2 = params['n2']
+    tmax1 = params['tmax1']
+    tmax2 = params['tmax2']
+    return s1 * ((x**n1) * (np.e**((-n1*x)/tmax1))) + s2 * ((x**n2) * (np.e**((-n2*x)/tmax2)))
+    
+def _double_pupil_IRF_ls(params, x, data):
+    s1 = params['s1'].value
+    s2 = params['s2'].value
+    n1 = params['n1'].value
+    n2 = params['n2'].value
+    tmax1 = params['tmax1'].value
+    tmax2 = params['tmax2'].value
+    model = s1 * ((x**n1) * (np.e**((-n1*x)/tmax1))) + s2 * ((x**n2) * (np.e**((-n2*x)/tmax2)))
+    return model - data
     
 def detect_saccade_from_data(xy_data = None, vel_data = None, l = 5, sample_rate = 1000.0, minimum_saccade_duration = 0.0075):
     """Uses the engbert & mergenthaler algorithm (PNAS 2006) to detect saccades.
@@ -649,7 +672,7 @@ class EyeSignalOperator(Operator):
             print('you did not specify a tf-decomposition')
     
 
-    def regress_blinks(self, interval=7, regress_blinks=True, regress_sacs=True):
+    def regress_blinks(self, interval=7, regress_blinks=True, regress_sacs=True, use_standard_blinksac_kernels=True):
         """
         """
         
@@ -673,12 +696,57 @@ class EyeSignalOperator(Operator):
         sacs = sacs[sacs<((self.timepoints[-1]-self.timepoints[0]))-interval]
         sacs = sacs.astype(int)
         
-        # use standard values:
-        standard_blink_parameters = {'a1':-0.604, 'sh1':8.337, 'sc1':0.115, 'a2':0.419, 'sh2':15.433, 'sc2':0.178}
-        self.blink_kernel = _double_gamma(standard_blink_parameters, x)
-        standard_sac_parameters = {'a1':-0.175, 'sh1': 6.451, 'sc1':0.178, 'a2':0.0, 'sh2': 1, 'sc2': 1}
-        self.sac_kernel = _double_gamma(standard_sac_parameters, x)
-        
+        if use_standard_blinksac_kernels:
+            # use standard values:
+            standard_blink_parameters = {'a1':-0.604, 'sh1':8.337, 'sc1':0.115, 'a2':0.419, 'sh2':15.433, 'sc2':0.178}
+            self.blink_kernel = _double_gamma(standard_blink_parameters, x)
+            standard_sac_parameters = {'a1':-0.175, 'sh1': 6.451, 'sc1':0.178, 'a2':0.0, 'sh2': 1, 'sc2': 1}
+            self.sac_kernel = _double_gamma(standard_sac_parameters, x)
+        else:
+            
+            from lmfit import minimize, Parameters, Parameter, report_fit
+            import fir
+            
+            self.new_sample_rate = 20
+            
+            events = [blinks/float(self.sample_rate), 
+                      sacs/float(self.sample_rate)]
+            
+            # compute blink and sac kernels with deconvolution (on downsampled timeseries):
+            a = fir.FIRDeconvolution(signal=self.bp_filt_pupil, events=events, event_names=['blinks', 'sacs'], sample_frequency=self.sample_rate, deconvolution_frequency=self.new_sample_rate, deconvolution_interval=[0,interval],)
+            a.create_design_matrix()
+            a.regress()
+            a.betas_for_events()
+            self.blink_response_downsampled = np.array(a.betas_per_event_type[0]).ravel()
+            self.sac_response_downsampled = np.array(a.betas_per_event_type[1]).ravel()
+            
+            # demean kernels:
+            self.blink_response_downsampled = self.blink_response_downsampled - self.blink_response_downsampled[:int(0.25*self.new_sample_rate)].mean()
+            self.sac_response_downsampled = self.sac_response_downsampled - self.sac_response_downsampled[:int(0.25*self.new_sample_rate)].mean()
+            
+            # create data to be fitted
+            x = np.linspace(0,interval,len(self.blink_response_downsampled))
+            
+            # create a set of Parameters
+            params = Parameters()
+            params.add('s1', value=-1, min=-np.inf, max=-1e-25)
+            params.add('s2', value=1, min=1e-25, max=np.inf)
+            params.add('n1', value=10, min=9, max=11)
+            params.add('n2', value=10, min=8, max=12)
+            params.add('tmax1', value=0.9, min=0.5, max=1.5)
+            params.add('tmax2', value=2.5, min=1.5, max=4)
+            
+            # do fit, here with powell method:
+            blink_result = minimize(_double_pupil_IRF_ls, params, method='powell', args=(x, self.blink_response_downsampled))
+            self.blink_fit = _double_pupil_IRF(blink_result.params, x)
+            sac_result = minimize(_double_pupil_IRF_ls, params, method='powell', args=(x, self.sac_response_downsampled))
+            self.sac_fit = _double_pupil_IRF(sac_result.params, x)
+            
+            # upsample:
+            x = np.linspace(0,interval,interval*self.sample_rate)
+            self.blink_kernel = _double_pupil_IRF(blink_result.params, x)
+            self.sac_kernel = _double_pupil_IRF(sac_result.params, x)
+            
         # blink and saccade regressors:
         blink_reg = np.zeros(self.bp_filt_pupil.shape[0])
         blink_reg[blinks] = 1
@@ -759,16 +827,25 @@ class EyeSignalOperator(Operator):
         ax2.set_ylabel('Diff pupil size (raw)')
         ax2.set_xlabel('Time (min)')
         
-        x = np.linspace(0,self.blink_kernel.shape[0]/self.sample_rate, self.blink_kernel.shape[0])
-        # ax3.plot(x, self.blink_response, label='response')
-        ax3.plot(x, self.blink_kernel, label='fit')
+        try:
+            x = np.linspace(0,self.blink_response_downsampled.shape[0]/self.new_sample_rate, self.blink_response_downsampled.shape[0])
+            ax3.plot(x, self.blink_response_downsampled, label='measured')
+            ax3.plot(x, self.blink_fit, label='fitted')
+        except:
+            x = np.linspace(0,self.blink_kernel.shape[0]/self.sample_rate, self.blink_kernel.shape[0])
+            ax3.plot(x, self.blink_kernel, label='standard')
         ax3.legend()
         ax3.set_title('Blink response')
         ax3.set_xlabel('Time (s)')
         ax3.set_ylabel('Pupil response (a.u.)')
         
-        # ax4.plot(x, self.sac_response, label='response')
-        ax4.plot(x, self.sac_kernel, label='fit')
+        try:
+            x = np.linspace(0,self.sac_response_downsampled.shape[0]/self.new_sample_rate, self.sac_response_downsampled.shape[0])
+            ax4.plot(x, self.sac_response_downsampled, label='measured')
+            ax4.plot(x, self.sac_fit, label='fitted')
+        except:
+            x = np.linspace(0,self.sac_kernel.shape[0]/self.sample_rate, self.sac_kernel.shape[0])
+            ax4.plot(x, self.blink_kernel, label='standard')
         ax4.legend()
         ax4.set_title('Saccade response')
         ax4.set_xlabel('Time (s)')
