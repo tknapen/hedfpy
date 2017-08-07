@@ -158,6 +158,7 @@ class HDFEyeOperator(Operator):
             normalization = 'psc',
             regress_blinks = True,
             regress_sacs = True,
+            regress_xy = False, 
             use_standard_blinksac_kernels = True,
             minimal_frequency_filterbank = 0.0025, 
             maximal_frequency_filterbank = 0.1, 
@@ -247,7 +248,7 @@ class HDFEyeOperator(Operator):
                     
                     # regress blink and saccade responses
                     # try:
-                    eso.regress_blinks(regress_blinks=regress_blinks, regress_sacs=regress_blinks, use_standard_blinksac_kernels=use_standard_blinksac_kernels)
+                    eso.regress_blinks(regress_blinks=regress_blinks, regress_sacs=regress_sacs, regress_xy=regress_xy, use_standard_blinksac_kernels=use_standard_blinksac_kernels)
                     # except:
                     #     eso.lp_filt_pupil_clean = eso.lp_filt_pupil.copy()
                     #     eso.bp_filt_pupil_clean = eso.bp_filt_pupil.copy()

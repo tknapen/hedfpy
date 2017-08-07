@@ -16,6 +16,7 @@ analysis_params = {
                 'normalization' : 'psc',
                 'regress_blinks' : True,
                 'regress_sacs' : True,
+                'regress_xy' : False,
                 'use_standard_blinksac_kernels' : False,
                 }
 subjects = [
