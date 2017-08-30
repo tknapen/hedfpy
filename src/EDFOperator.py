@@ -319,7 +319,7 @@ class EDFOperator( Operator ):
             
     
     def read_key_events(self, 
-        key_re = 'MSG\t([\d\.]+)\ttrial X event \<Event\((\d)-Key(\S*?) {\'scancode\': (\d+), \'key\': (\d+)(, \'unicode\': u\'\S*?\',|,) \'mod\': (\d+)}\)\> at (\d+.\d)'):
+        key_re = 'MSG\t([\d\.]+)\ttrial X event \<Event\((\d)-Key(\S*?) {\'scancode\': (\d+), \'key\': ([-+]?\d+)(, \'unicode\': u\'\S*?\',|,) \'mod\': (\d+)}\)\> at (\d+.\d)'):
         """read_key_events reads experimental events from the message file"""
         self.logger.info('reading key_events from %s', os.path.split(self.message_file)[-1])
         self.get_message_string()
