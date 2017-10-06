@@ -9,7 +9,7 @@ Copyright (c) 2010 __MyCompanyName__. All rights reserved.
 
 import tempfile, logging
 import numpy as np
-from log import *
+from .log import *
 
 class Operator( object ):
     def __init__(self, input_object, **kwargs):

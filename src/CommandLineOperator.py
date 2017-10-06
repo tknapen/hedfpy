@@ -15,8 +15,8 @@ import numpy as np
 import matplotlib.pylab as pl
 from IPython import embed as shell
 
-from Operator import *
-from log import *
+from .Operator import *
+from .log import *
 
 ### Execute program in shell:
 def ExecCommandLine(cmdline):

@@ -23,7 +23,7 @@ from scipy.signal import butter, lfilter, filtfilt, fftconvolve, resample
 import scipy.interpolate as interpolate
 import scipy.stats as stats
 
-from Operator import Operator
+from .Operator import Operator
 
 from IPython import embed as shell
 
@@ -540,8 +540,8 @@ class EyeSignalOperator(Operator):
         
         self.interpolated_time_points = np.zeros(len(self.interpolated_pupil))
         self.pupil_diff = (np.diff(self.interpolated_pupil) - np.diff(self.interpolated_pupil).mean()) / np.diff(self.interpolated_pupil).std()
-        peaks_down = detect_peaks(self.pupil_diff, mph=10, mpd=1, threshold=None, edge='rising', kpsh=False, valley=False, show=False, ax=False)
-        peaks_up = detect_peaks(self.pupil_diff*-1, mph=10, mpd=1, threshold=None, edge='rising', kpsh=False, valley=False, show=False, ax=False)
+        peaks_down = detect_peaks(self.pupil_diff, mph=10, mpd=1, threshold=0, edge='rising', kpsh=False, valley=False, show=False, ax=False)
+        peaks_up = detect_peaks(self.pupil_diff*-1, mph=10, mpd=1, threshold=0, edge='rising', kpsh=False, valley=False, show=False, ax=False)
         self.peaks = np.sort(np.concatenate((peaks_down, peaks_up)))
         
         if len(self.peaks) > 0:

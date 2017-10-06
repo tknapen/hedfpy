@@ -11,9 +11,9 @@ import scipy as sp
 from tables import *
 import pandas as pd
 
-from EDFOperator import EDFOperator
-from Operator import Operator
-from EyeSignalOperator import EyeSignalOperator, detect_saccade_from_data
+from .EDFOperator import EDFOperator
+from .Operator import Operator
+from .EyeSignalOperator import EyeSignalOperator, detect_saccade_from_data
 
 from IPython import embed as shell 
 
@@ -426,17 +426,18 @@ class HDFEyeOperator(Operator):
         """the time period corresponding to the trial phases requested.
         """
         with pd.get_store(self.input_object) as h5_file:
-            table = h5_file['%s/trial_phases'%alias]
+            phase_table = h5_file['%s/trial_phases'%alias]
+            trial_table = h5_file['%s/trials'%alias]
             # check whether one of the trial phases is the end or the beginning of the trial.
             # if so, then supplant the time of that phase with its trial's end or start time.
             if trial_phases[0] == 0:
-                start_time = table[table['trial_start_index'] == trial_nr]['trial_start_EL_timestamp']
+                start_time = trial_table[trial_table['trial_start_index'] == trial_nr]['trial_start_EL_timestamp']
             else:
-                start_time = table[((table['trial_phase_index'] == trial_phases[0]) * (table['trial_phase_trial'] == trial_nr))]['trial_phase_EL_timestamp']
+                start_time = phase_table[((phase_table['trial_phase_index'] == trial_phases[0]) * (phase_table['trial_phase_trial'] == trial_nr))]['trial_phase_EL_timestamp']
             if trial_phases[-1] == -1:
-                end_time = table[table['trial_start_index'] == trial_nr]['trial_end_EL_timestamp']
+                end_time = trial_table[trial_table['trial_start_index'] == trial_nr]['trial_end_EL_timestamp']
             else:
-                end_time = table[((table['trial_phase_index'] == trial_phases[1]) * (table['trial_phase_trial'] == trial_nr))]['trial_phase_EL_timestamp']
+                end_time = phase_table[((phase_table['trial_phase_index'] == trial_phases[1]) * (phase_table['trial_phase_trial'] == trial_nr))]['trial_phase_EL_timestamp']
             time_period = np.array([np.array(start_time), np.array(end_time)]).squeeze()
         return time_period
 

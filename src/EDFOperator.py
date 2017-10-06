@@ -19,8 +19,8 @@ import scipy as sp
 
 from itertools import chain
 
-from CommandLineOperator import EDF2ASCOperator
-from Operator import Operator
+from .CommandLineOperator import EDF2ASCOperator
+from .Operator import Operator
 
 from IPython import embed as shell
 
@@ -313,8 +313,7 @@ class EDFOperator( Operator ):
         
         if len(parameters) > 0:        # there were parameters in the edf file
             self.parameters = parameters
-            print([k.keys() for k in self.parameters])
-            ptd = [(k, np.float64) for k in np.unique(np.concatenate([k.keys() for k in self.parameters]))]
+            ptd = [(k, np.float64) for k in np.unique(np.concatenate([list(k.keys()) for k in self.parameters]))]
             self.parameter_type_dictionary = np.dtype(ptd)
         else: # we have to take the parameters from the output_dict pickle file of the same name as the edf file. 
             self.logger.info('no parameter information in edf file')
