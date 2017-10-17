@@ -1,4 +1,4 @@
-__version__ = '0.0.dev1'
+__version__ = '0.0.dev3'
 
 from .EDFOperator import EDFOperator
 from .HDFEyeOperator import HDFEyeOperator
