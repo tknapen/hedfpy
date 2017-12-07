@@ -464,7 +464,7 @@ class EyeSignalOperator(Operator):
         self.interpolated_y[-coalesce_period:] = np.mean(self.interpolated_y[np.where(self.interpolated_pupil > 0)[0][-1000:]])
         
         # detect zero edges (we just created from blinks, plus missing data):
-        zero_edges = np.arange(self.interpolated_pupil.shape[0])[np.diff((self.interpolated_pupil<1))]
+        zero_edges = np.arange(self.interpolated_pupil.shape[0]-1)[np.diff((self.interpolated_pupil<1))]
         if zero_edges.shape[0] == 0:
             pass
         else:
@@ -492,10 +492,10 @@ class EyeSignalOperator(Operator):
         if sum(start_indices) > 0:
             self.blink_starts = self.blink_starts[start_indices]
             self.blink_ends = self.blink_ends[end_indices]
+            self.do_blink_interpolation = True
         else:
-            self.blink_starts = None
-            self.blink_ends = None
-            
+            self.do_blink_interpolation = False
+        
         # do actual interpolation:
         if method == 'spline':
             points_for_interpolation = np.array(np.array(spline_interpolation_points) * self.sample_rate, dtype = int)
@@ -509,7 +509,7 @@ class EyeSignalOperator(Operator):
                 spline = interpolate.InterpolatedUnivariateSpline(sample_indices,self.raw_gaze_Y[sample_indices])
                 self.interpolated_y[sample_indices[0]:sample_indices[-1]] = spline(np.arange(sample_indices[1],sample_indices[-2]))
         elif method == 'linear':
-            if self.blink_starts != None:
+            if self.do_blink_interpolation:
                 points_for_interpolation = np.array([self.blink_starts, self.blink_ends], dtype=int).T + np.array(lin_interpolation_points).T
                 for itp in points_for_interpolation:
                     self.interpolated_pupil[itp[0]:itp[-1]] = np.linspace(self.interpolated_pupil[itp[0]], self.interpolated_pupil[itp[-1]], itp[-1]-itp[0])
