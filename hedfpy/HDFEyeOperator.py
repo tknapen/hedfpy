@@ -411,18 +411,42 @@ class HDFEyeOperator(Operator):
     #
     #    second, based also on trials, using the above functionality
     #
+
+    def get_time_period_for_trial(self, trial_nr, alias, time_extensions=[0,0]):
+        """ Get the timestamps for the start and end of a given trial and alias """
     
-    def signal_from_trial(self, trial_nr, alias, signal, requested_eye = 'L', time_extensions = [0,0]):
-        """docstring for signal_from_trial"""
         with pd.get_store(self.input_object) as h5_file:
             table = h5_file['%s/trials'%alias]
-            time_period = [
-                table[table['trial_start_index'] == trial_nr]['trial_start_EL_timestamp'] + time_extensions[0],
-                table[table['trial_start_index'] == trial_nr]['trial_end_EL_timestamp'] + time_extensions[1]
-            ]            
+        table = table.set_index('trial_start_index')
 
+        return table.ix[trial_nr].trial_start_EL_timestamp, table.ix[trial_nr].trial_end_EL_timestamp
+
+    def signal_from_trial(self, trial_nr, alias, signal, requested_eye = 'L', time_extensions = [0,0]):
+        """ Get the eye-related signal from a specific trial """
+
+        time_period = self.get_time_period_for_trial(trial_nr, alias, time_extensions)
         return self.signal_during_period(time_period, alias, signal, requested_eye = requested_eye)
-    
+
+    def get_signal_keys(self, trial_nr, alias):
+        """ Get keys of processed data signals present in the HDF5
+        file """
+        with pd.get_store(self.input_object) as h5_file:
+            table = h5_file['%s/trials'%alias]
+        return table.columns
+
+    def events_from_trial(self, trial_nr, alias):
+        """ Get all events for a given trial """
+
+        time_period = self.get_time_period_for_trial(trial_nr, alias)
+        return self.events_during_period(time_period, alias)
+
+    def events_during_period(self, time_period, alias):
+        with pd.get_store(self.input_object) as h5_file:
+            table = h5_file['%s/events'%alias]
+       
+        return table[(table.EL_timestamp > time_period[0]) & (table.EL_timestamp < time_period[1])]
+        
+
     def time_period_for_trial_phases(self, trial_nr, trial_phases, alias ):
         """the time period corresponding to the trial phases requested.
         """
