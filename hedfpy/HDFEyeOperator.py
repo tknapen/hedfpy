@@ -203,7 +203,7 @@ class HDFEyeOperator(Operator):
         #
         #    gaze data in blocks
         #
-        with pd.get_store(self.input_object) as h5_file:
+        with pd.HDFStore(self.input_object) as h5_file:
             # shell()
             # recreate the non-gaze data for the block, that is, its sampling rate, eye of origin etc.
             blocks_data_frame = pd.DataFrame([dict([[i,self.edf_operator.blocks[j][i]] for i in self.edf_operator.blocks[0].keys() if i not in ('block_data', 'data_columns')]) for j in range(len(self.edf_operator.blocks))])
@@ -316,7 +316,7 @@ class HDFEyeOperator(Operator):
     
     def data_frame_to_hdf(self, alias, name, data_frame):
         """docstring for data_frame_to_hdf"""
-        with pd.get_store(self.input_object) as h5_file:
+        with pd.HDFStore(self.input_object) as h5_file:
             h5_file.put("/%s/%s"%(alias, name), data_frame)
     
     #
@@ -331,7 +331,7 @@ class HDFEyeOperator(Operator):
     def data_from_time_period(self, time_period, alias, columns = None):
         """data_from_time_period delivers a set of data of type data_type for a given timeperiod"""
         # find the block in which the data resides, based on just the first time of time_period
-        with pd.get_store(self.input_object) as h5_file:
+        with pd.HDFStore(self.input_object) as h5_file:
             period_block_nr = self.sample_in_block(sample = time_period[0], block_table = h5_file['%s/blocks'%alias]) 
             table = h5_file['%s/block_%i'%(alias, period_block_nr)]
             if columns == None:
@@ -342,40 +342,40 @@ class HDFEyeOperator(Operator):
     
     def eye_during_period(self, time_period, alias):
         """eye_during_period returns the identity of the eye that was recorded during a given period"""
-        with pd.get_store(self.input_object) as h5_file:
+        with pd.HDFStore(self.input_object) as h5_file:
             period_block_nr = self.sample_in_block(sample = time_period[0], block_table = h5_file['%s/blocks'%alias])
             eye = h5_file['%s/blocks'%alias]['eye_recorded'][period_block_nr]
         return eye
     
     def eye_during_trial(self, trial_nr, alias):
         """docstring for signal_from_trial"""
-        with pd.get_store(self.input_object) as h5_file:
+        with pd.HDFStore(self.input_object) as h5_file:
             table = h5_file['%s/trials'%alias]
             time_period = np.array(table[table['trial_start_index'] == trial_nr][['trial_start_EL_timestamp', 'trial_end_EL_timestamp']])
         return self.eye_during_period(time_period[0], alias)
 
     def screen_dimensions_during_period(self, time_period, alias):
         """docstring for eye_during_period"""
-        with pd.get_store(self.input_object) as h5_file:
+        with pd.HDFStore(self.input_object) as h5_file:
             period_block_nr = self.sample_in_block(sample = time_period[0], block_table = h5_file['%s/blocks'%alias])
             return np.array(h5_file['%s/blocks'%alias][['screen_x_pix','screen_y_pix']][period_block_nr:period_block_nr+1]).squeeze()
 
     def screen_dimensions_during_trial(self, trial_nr, alias):
         """docstring for eye_during_period"""
-        with pd.get_store(self.input_object) as h5_file:
+        with pd.HDFStore(self.input_object) as h5_file:
             table = h5_file['%s/trials'%alias]
             time_period = np.array(table[table['trial_start_index'] == trial_nr][['trial_start_EL_timestamp', 'trial_end_EL_timestamp']])[0]
         return self.screen_dimensions_during_period(time_period = time_period, alias = alias)    
     
     def sample_rate_during_period(self, time_period, alias):
         """docstring for eye_during_period"""
-        with pd.get_store(self.input_object) as h5_file:
+        with pd.HDFStore(self.input_object) as h5_file:
             period_block_nr = self.sample_in_block(sample = time_period[0], block_table = h5_file['%s/blocks'%alias])
             return h5_file['%s/blocks'%alias]['sample_rate'][period_block_nr]
     
     def sample_rate_during_trial(self, trial_nr, alias):
         """docstring for signal_from_trial"""
-        with pd.get_store(self.input_object) as h5_file:
+        with pd.HDFStore(self.input_object) as h5_file:
             table = h5_file['%s/trials'%alias]
             time_period = np.array(table[table['trial_start_index'] == trial_nr][['trial_start_EL_timestamp', 'trial_end_EL_timestamp']])
         return float(self.sample_rate_during_period(time_period[0], alias))
@@ -398,7 +398,7 @@ class HDFEyeOperator(Operator):
             else:
                 columns = [s%signal for s in [requested_eye + '_%s']]
         else:
-            with pd.get_store(self.input_object) as h5_file:
+            with pd.HDFStore(self.input_object) as h5_file:
                 self.logger.error('requested eye %s not found in block %i' % (requested_eye, self.sample_in_block(time_period[0], block_table = h5_file['%s/blocks'%alias])))
             return None    # assert something, dammit!
         return self.data_from_time_period(time_period, alias, columns)
@@ -415,7 +415,7 @@ class HDFEyeOperator(Operator):
     def get_time_period_for_trial(self, trial_nr, alias, time_extensions=[0,0]):
         """ Get the timestamps for the start and end of a given trial and alias """
     
-        with pd.get_store(self.input_object) as h5_file:
+        with pd.HDFStore(self.input_object) as h5_file:
             table = h5_file['%s/trials'%alias]
         table = table.set_index('trial_start_index')
 
@@ -430,8 +430,8 @@ class HDFEyeOperator(Operator):
     def get_signal_keys(self, trial_nr, alias):
         """ Get keys of processed data signals present in the HDF5
         file """
-        with pd.get_store(self.input_object) as h5_file:
-            table = h5_file['%s/trials'%alias]
+        with pd.HDFStore(self.input_object) as h5_file:
+            table = h5_file['%s/block_%s/block1_items' % (alias, trial_nr)]
         return table.columns
 
     def events_from_trial(self, trial_nr, alias):
@@ -441,7 +441,7 @@ class HDFEyeOperator(Operator):
         return self.events_during_period(time_period, alias)
 
     def events_during_period(self, time_period, alias):
-        with pd.get_store(self.input_object) as h5_file:
+        with pd.HDFStore(self.input_object) as h5_file:
             table = h5_file['%s/events'%alias]
        
         return table[(table.EL_timestamp > time_period[0]) & (table.EL_timestamp < time_period[1])]
@@ -450,7 +450,7 @@ class HDFEyeOperator(Operator):
     def time_period_for_trial_phases(self, trial_nr, trial_phases, alias ):
         """the time period corresponding to the trial phases requested.
         """
-        with pd.get_store(self.input_object) as h5_file:
+        with pd.HDFStore(self.input_object) as h5_file:
             phase_table = h5_file['%s/trial_phases'%alias]
             trial_table = h5_file['%s/trials'%alias]
             # check whether one of the trial phases is the end or the beginning of the trial.
@@ -493,6 +493,6 @@ class HDFEyeOperator(Operator):
         a data kind (e.g. 'trials'), respectively.
         """
         
-        with pd.get_store(self.input_object) as h5_file:
+        with pd.HDFStore(self.input_object) as h5_file:
             session_data = h5_file['%s/%s'%(alias, name)]
         return session_data
