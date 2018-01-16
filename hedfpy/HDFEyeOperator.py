@@ -431,7 +431,7 @@ class HDFEyeOperator(Operator):
         """ Get keys of processed data signals present in the HDF5
         file """
         with pd.HDFStore(self.input_object) as h5_file:
-            table = h5_file['%s/block_%s/block1_items' % (alias, trial_nr)]
+            table = h5_file['%s/block_%s' % (alias, trial_nr)]
         return table.columns
 
     def events_from_trial(self, trial_nr, alias):
