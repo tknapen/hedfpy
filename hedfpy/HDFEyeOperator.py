@@ -432,6 +432,16 @@ class HDFEyeOperator(Operator):
     #    second, based also on trials, using the above functionality
     #
 
+    def blinks_during_period(self, time_period, alias):
+        with pd.HDFStore(self.input_object) as h5_file:
+            table = h5_file['%s/blinks_from_message_file'%alias]
+       
+        return table[(table.start_timestamp > time_period[0]) & (table.start_timestamp < time_period[1])]
+
+    def blinks_during_trial(self, trial_nr, alias):
+        time_period = self.get_time_period_for_trial(trial_nr, alias)
+        return self.blinks_during_period(time_period, alias)
+
     def get_time_period_for_trial(self, trial_nr, alias, time_extensions=[0,0]):
         """ Get the timestamps for the start and end of a given trial and alias """
     
