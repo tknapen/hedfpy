@@ -386,9 +386,14 @@ class HDFEyeOperator(Operator):
         return table.ix[block_nr]
 
     
-    def signal_during_period(self, time_period, alias, signal, requested_eye = 'L'):
+    def signal_during_period(self, time_period, alias, signal, requested_eye=None):
         """docstring for gaze_during_period"""
+
         recorded_eye = self.eye_during_period(time_period, alias)
+
+        if requested_eye is None:
+            requested_eye = recorded_eye
+
         if requested_eye == 'LR' and recorded_eye == 'LR':
             if np.any([signal == 'gaze', signal == 'vel']):
                 columns = [s%signal for s in ['L_%s_x', 'L_%s_y', 'R_%s_x', 'R_%s_y']]
@@ -427,7 +432,7 @@ class HDFEyeOperator(Operator):
 
         return table.ix[trial_nr].trial_start_EL_timestamp, table.ix[trial_nr].trial_end_EL_timestamp
 
-    def signal_from_trial(self, trial_nr, alias, signal, requested_eye = 'L', time_extensions = [0,0]):
+    def signal_from_trial(self, trial_nr, alias, signal, requested_eye = None, time_extensions = [0,0]):
         """ Get the eye-related signal from a specific trial """
 
         time_period = self.get_time_period_for_trial(trial_nr, alias, time_extensions)
