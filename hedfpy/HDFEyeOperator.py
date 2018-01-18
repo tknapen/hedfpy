@@ -367,6 +367,15 @@ class HDFEyeOperator(Operator):
             time_period = np.array(table[table['trial_start_index'] == trial_nr][['trial_start_EL_timestamp', 'trial_end_EL_timestamp']])
         return float(self.sample_rate_during_period(time_period[0], alias))
 
+    def trial_properties(self, alias, trial=None):
+        if trial is None:
+            trial= slice(None)
+
+        with pd.HDFStore(self.input_object) as h5_file:
+            table = h5_file['%s/trials'%alias]
+
+        return table.ix[trial]
+
     def block_properties(self, alias, block_nr=None):
         if block_nr is None:
             block_nr = slice(None)
