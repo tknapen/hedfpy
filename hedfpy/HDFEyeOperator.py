@@ -476,6 +476,17 @@ class HDFEyeOperator(Operator):
        
         return table[(table.EL_timestamp > time_period[0]) & (table.EL_timestamp < time_period[1])]
         
+    def sounds_from_trial(self, trial_nr, alias):
+        """ Get all sounds for a given trial """
+
+        time_period = self.get_time_period_for_trial(trial_nr, alias)
+        return self.sounds_during_period(time_period, alias)
+
+    def sounds_during_period(self, time_period, alias):
+        with pd.HDFStore(self.input_object) as h5_file:
+            table = h5_file['%s/sounds'%alias]
+       
+        return table[(table.EL_timestamp > time_period[0]) & (table.EL_timestamp < time_period[1])]
 
     def time_period_for_trial_phases(self, trial_nr, trial_phases, alias ):
         """the time period corresponding to the trial phases requested.
