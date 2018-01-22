@@ -2,6 +2,7 @@ import os, sys, subprocess, re
 import tempfile, logging
 import pickle
 from datetime import *
+import warnings
 
 from math import *
 import numpy as np
@@ -360,6 +361,14 @@ class HDFEyeOperator(Operator):
             period_block_nr = self.sample_in_block(sample = time_period[0], block_table = h5_file['%s/blocks'%alias])
             return h5_file['%s/blocks'%alias]['sample_rate'][period_block_nr]
     
+    def sample_rate_during_period(self, time_period, alias):
+
+        block = self.block_for_time_period(alias, time_period)
+
+        return self.block_properties(alias, block).sample_rate
+
+
+
     def sample_rate_during_trial(self, trial_nr, alias):
         """docstring for signal_from_trial"""
         with pd.HDFStore(self.input_object) as h5_file:
@@ -423,14 +432,19 @@ class HDFEyeOperator(Operator):
             return None    # assert something, dammit!
         return self.data_from_time_period(time_period, alias, columns)
     
-    def saccades_during_period(self, time_period, alias, requested_eye = 'L', l = 5):
+    def saccades_during_period(self, time_period, alias, requested_eye=None, l = 5):
+        recorded_eye = self.eye_during_period(time_period, alias)
+
+        if requested_eye is None:
+            requested_eye = recorded_eye
+
         xy_data = self.signal_during_period(time_period = time_period, alias = alias, signal = 'gaze', requested_eye = requested_eye)
         vel_data = self.signal_during_period(time_period = time_period, alias = alias, signal = 'vel', requested_eye = requested_eye) 
         return detect_saccade_from_data(xy_data = xy_data, vel_data = vel_data, l = l, sample_rate = self.sample_rate_during_period(time_period, alias))
 
-    #
-    #    second, based also on trials, using the above functionality
-    #
+    def saccades_during_trial(self, trial_nr, alias):
+        time_period = self.get_time_period_for_trial(trial_nr, alias)
+        return self.saccades_during_period(time_period, alias) 
 
     def blinks_during_period(self, time_period, alias):
         with pd.HDFStore(self.input_object) as h5_file:
@@ -518,13 +532,6 @@ class HDFEyeOperator(Operator):
         time_period = np.array([time_period[0] + time_extensions[0], time_period[1] + time_extensions[1]]).squeeze()
         return self.saccades_during_period(time_period = time_period, alias = alias, requested_eye = requested_eye, time_extensions = time_extensions, l = l)
 
-        # xy_data = self.signal_from_trial_phases(trial_nr = trial_nr, trial_phases = trial_phases, alias = alias, signal = 'gaze', requested_eye = requested_eye, time_extensions = time_extensions)
-        # vel_data = self.signal_from_trial_phases(trial_nr = trial_nr, trial_phases = trial_phases, alias = alias, signal = 'vel', requested_eye = requested_eye, time_extensions = time_extensions) 
-        # return detect_saccade_from_data(xy_data = xy_data, vel_data = vel_data, l = l, sample_rate = self.sample_rate_during_period(self.time_period_for_trial_phases(trial_nr = trial_nr, trial_phases = trial_phases, alias = alias), alias))
-            
-    #
-    #    read whole dataframes
-    #
     
     def read_session_data(self, alias, name):
         """
@@ -537,3 +544,40 @@ class HDFEyeOperator(Operator):
         with pd.HDFStore(self.input_object) as h5_file:
             session_data = h5_file['%s/%s'%(alias, name)]
         return session_data
+
+    def trial_for_time_period(self, alias, time_period):
+        """
+        Returns a trial index for a given time period.
+        Raises a warning (no Exception) when the time period spans
+        multiple trials, and only returns index of the first of those
+        trials.
+        """
+
+        trial_properties = self.trial_properties(alias)
+        trial = trial_properties[(trial_properties.trial_start_EL_timestamp < time_period[0]) * (trial_properties.trial_end_EL_timestamp > time_period[0])]
+
+        if len(trial) == 0:
+            raise Exception('No trial found for this time_period')
+
+        assert(len(trial == 1)), "Found more than one trial in which this time period starts. Something is wrong with the data"
+
+        trial = trial.iloc[0]
+
+        if time_period[1] > trial.trial_end_EL_timestamp:
+            warnings.warn(' *** This time period spans multiple trials. Only index of first trial is returned. *** ')
+
+        return int(trial.trial_start_index)
+
+    def block_for_time_period(self, alias, time_period):
+        block_properties = self.block_properties(alias)
+
+        block = block_properties[(block_properties.block_start_timestamp < time_period[0]) * (block_properties.block_end_timestamp > time_period[0])]
+
+        assert(len(block == 1)), "Found more than one block in which this time period starts. Something is wrong with the data"
+
+        block = block.iloc[0]
+
+        if time_period[1] > block.block_end_timestamp:
+            warnings.warn(' *** This time period spans multiple blocks. Only index of first trial is returned. *** ')
+
+        return int(block.name)
