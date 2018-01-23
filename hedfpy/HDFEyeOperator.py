@@ -432,7 +432,7 @@ class HDFEyeOperator(Operator):
             return None    # assert something, dammit!
         return self.data_from_time_period(time_period, alias, columns)
     
-    def saccades_during_period(self, time_period, alias, requested_eye=None, l = 5):
+    def detect_saccades_during_period(self, time_period, alias, requested_eye=None, l = 5):
         recorded_eye = self.eye_during_period(time_period, alias)
 
         if requested_eye is None:
@@ -440,17 +440,32 @@ class HDFEyeOperator(Operator):
 
         xy_data = self.signal_during_period(time_period = time_period, alias = alias, signal = 'gaze', requested_eye = requested_eye)
         vel_data = self.signal_during_period(time_period = time_period, alias = alias, signal = 'vel', requested_eye = requested_eye) 
-        return detect_saccade_from_data(xy_data = xy_data, vel_data = vel_data, l = l, sample_rate = self.sample_rate_during_period(time_period, alias))
+        saccades = detect_saccade_from_data(xy_data = xy_data, vel_data = vel_data, l = l, sample_rate = self.sample_rate_during_period(time_period, alias))
+        saccades = pd.DataFrame(saccades)
 
-    def saccades_during_trial(self, trial_nr, alias):
+        saccades['start_timestamp'] = saccades['expanded_start_time']  + time_period[0]
+        saccades['end_timestamp'] = saccades['expanded_end_time']  + time_period[0]
+
+        return saccades
+
+    def detect_saccades_during_trial(self, trial_nr, alias):
         time_period = self.get_time_period_for_trial(trial_nr, alias)
-        return self.saccades_during_period(time_period, alias) 
+        return self.detect_saccades_during_period(time_period, alias) 
 
     def blinks_during_period(self, time_period, alias):
         with pd.HDFStore(self.input_object) as h5_file:
             table = h5_file['%s/blinks_from_message_file'%alias]
        
         return table[(table.start_timestamp > time_period[0]) & (table.start_timestamp < time_period[1])]
+
+    def saccades_from_message_file_during_period(self, time_period, alias):
+        table =  self.read_session_data(alias, 'saccades_from_message_file')
+        return table[(table.start_timestamp > time_period[0]) & (table.start_timestamp < time_period[1])]
+
+    def saccades_from_message_file_during_trial(self, trial_nr, alias):
+        time_period = self.get_time_period_for_trial(trial_nr, alias)
+        return self.saccades_from_message_file_during_period(time_period, alias) 
+
 
     def blinks_during_trial(self, trial_nr, alias):
         time_period = self.get_time_period_for_trial(trial_nr, alias)
@@ -461,6 +476,7 @@ class HDFEyeOperator(Operator):
     
         with pd.HDFStore(self.input_object) as h5_file:
             table = h5_file['%s/trials'%alias]
+
         table = table.set_index('trial_start_index')
 
         return table.ix[trial_nr].trial_start_EL_timestamp, table.ix[trial_nr].trial_end_EL_timestamp
@@ -527,10 +543,10 @@ class HDFEyeOperator(Operator):
         time_period = np.array([time_period[0] + time_extensions[0], time_period[1] + time_extensions[1]]).squeeze()
         return self.signal_during_period(time_period, alias, signal, requested_eye = requested_eye)
     
-    def saccades_from_trial_phases(self, trial_nr, trial_phases, alias, requested_eye = 'L', time_extensions = [0,0], l = 5):
+    def detect_saccades_from_trial_phases(self, trial_nr, trial_phases, alias, requested_eye = 'L', time_extensions = [0,0], l = 5):
         time_period = self.time_period_for_trial_phases(trial_nr = trial_nr, trial_phases = trial_phases, alias = alias)
         time_period = np.array([time_period[0] + time_extensions[0], time_period[1] + time_extensions[1]]).squeeze()
-        return self.saccades_during_period(time_period = time_period, alias = alias, requested_eye = requested_eye, time_extensions = time_extensions, l = l)
+        return self.detect_saccades_during_period(time_period = time_period, alias = alias, requested_eye = requested_eye, time_extensions = time_extensions, l = l)
 
     
     def read_session_data(self, alias, name):
