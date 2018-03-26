@@ -857,7 +857,7 @@ class EyeSignalOperator(Operator):
             ax4.plot(x, self.sac_fit, label='fitted')
         except:
             x = np.linspace(0,self.sac_kernel.shape[0]/self.sample_rate, self.sac_kernel.shape[0])
-            ax4.plot(x, self.blink_kernel, label='standard')
+            ax4.plot(x, self.sac_kernel, label='standard')
         ax4.legend()
         ax4.set_title('Saccade response')
         ax4.set_xlabel('Time (s)')
