@@ -1,9 +1,10 @@
-numpy==1.9.3
+numpy==1.11.1
 pandas==0.16.1
 scikit-learn==0.16.1
-scipy==0.16.0
-statsmodels==0.5.0
+scipy==0.18.0
+statsmodels==0.6.1
 tables==3.2.2
 ipython==4.0.1
-lmfit==0.9.2
+lmfit==0.9.5
 fir==0.0.dev10
+mne=0.12.0
