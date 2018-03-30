@@ -271,7 +271,7 @@ class HDFEyeOperator(Operator):
                     bdf[eye+'_pupil_bp_clean'] = eso.bp_filt_pupil_clean
                     
                     # add normalized timeseries:
-                    if normalization == 'zcore':
+                    if normalization == 'zscore':
                         eso.zscore_pupil(dtype='lp_filt_pupil')
                         eso.zscore_pupil(dtype='lp_filt_pupil_clean')
                         eso.zscore_pupil(dtype='bp_filt_pupil')
