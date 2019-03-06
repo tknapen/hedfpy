@@ -192,6 +192,8 @@ class EDFOperator( Operator ):
         self.read_key_events_unix()
         if not hasattr(self, 'events'):
             self.read_key_events_win()
+        if not hasattr(self, 'events'):
+            self.read_key_events_unix2()
         self.read_eyelink_events()
         self.read_sound_events()
     
@@ -223,17 +225,22 @@ class EDFOperator( Operator ):
             
             self.trial_starts = np.array([[float(s[0]), int(s[1]), float(s[2])] for s in self.start_trial_strings])
             self.trial_ends = np.array([[float(s[0]), int(s[1]), float(s[2])] for s in self.stop_trial_strings])
+            self.nr_trials = int(self.trial_ends[-1,1])+1
             
-            # sometimes we have twice as many trial starts as trial ends!
-            if 2 * len(self.trial_starts) == len(self.trial_ends):
-                self.trial_ends = self.trial_ends[::2]
+            # remove duplicate rows:
+            self.trial_starts = np.vstack([self.trial_starts[self.trial_starts[:,1]==t,:][0,:] for t in range(self.nr_trials)])            
+            self.trial_ends = np.vstack([self.trial_ends[self.trial_ends[:,1]==t,:][0,:] for t in range(self.nr_trials)])
+
+            # # sometimes we have twice as many trial starts as trial ends!
+            # if 2 * len(self.trial_starts) == len(self.trial_ends):
+            #     self.trial_ends = self.trial_ends[::2]
+
+            # # due to early task abortion we can have more trial starts than trial ends:
+            # if abs(len(self.trial_starts) - len(self.trial_ends)) == 1:
+            #     self.trial_starts = self.trial_starts[:-2]
+            #     self.trial_ends = self.trial_ends[:len(self.trial_starts)]
             
-            # due to early task abortion we can have more trial starts than trial ends:
-            if abs(len(self.trial_starts) - len(self.trial_ends)) == 1:
-                self.trial_starts = self.trial_starts[:-2]
-                self.trial_ends = self.trial_ends[:len(self.trial_starts)]
-            
-            self.nr_trials = len(self.trial_starts)
+            # self.nr_trials = len(self.trial_starts)
             self.trials = np.hstack((self.trial_starts, self.trial_ends))
             
             # create a dictionary for the types of timing informations we'd like to look at
@@ -266,7 +273,7 @@ class EDFOperator( Operator ):
         #
         # parameters 
         #
-        
+
         self.message_string = self.message_string.replace(' [','').replace('.]','')
         
         parameters = []
@@ -281,7 +288,7 @@ class EDFOperator( Operator ):
             
                 # we have double trials -- custom procedure!:
                 if nr_double_trials > 1:
-                    nr_params = len(param_names) / nr_double_trials
+                    nr_params = int(len(param_names) / nr_double_trials)
                     nr_param = 0
                     parameter_strings2 = []
                     for d in range(nr_double_trials):
@@ -348,6 +355,42 @@ class EDFOperator( Operator ):
             elif this_length == 3:
                 self.event_type_dictionary = np.dtype([('EL_timestamp', np.float64), ('event_type', np.float64), ('exp_timestamp', np.float64)])
     
+    def read_key_events_unix2(self, 
+        key_re = 'MSG\t([\d\.]+)\ttrial X event . at (\d+.\d)'):
+        """read_key_events reads experimental events from the message file"""
+        self.logger.info('reading key_events from %s', os.path.split(self.message_file)[-1])
+        self.get_message_string()
+        if not hasattr(self, 'nr_trials'):
+            self.read_trials()
+        
+        events = []
+        this_length = 0
+        for i in range(self.nr_trials):
+            this_key_re = key_re.replace(' X ', ' ' + str(i) + ' ')
+            event_strings = re.findall(re.compile(this_key_re), self.message_string)
+            if len(event_strings) > 0:
+                if len(event_strings[0]) == 8:
+                    events.append([{'EL_timestamp':float(e[0]),'event_type':int(e[1]),'up_down':e[2],'scancode':int(e[3]),'key':int(e[4]),'modifier':int(e[6]), 'exp_timestamp':float(e[7])} for e in event_strings])
+                    this_length = 8
+                elif len(event_strings[0]) == 3:
+                    events.append([{'EL_timestamp':float(e[0]),'event_type':int(e[1]), 'exp_timestamp':float(e[2])} for e in event_strings])
+                    this_length = 3
+                elif len(event_strings[0]) == 2:
+                    events.append([{'EL_timestamp':float(e[0]), 'exp_timestamp':float(e[1])} for e in event_strings])
+                    this_length = 2
+
+        if len(events) > 0:
+            self.events = list(chain.from_iterable(events))
+            #
+            # add types to eventTypeDictionary that specify the relevant trial and time in trial for this event - per run.
+            #
+            if this_length == 8:
+                self.event_type_dictionary = np.dtype([('EL_timestamp', np.float64), ('event_type', np.float64), ('up_down', '|S25'), ('scancode', np.float64), ('key', np.float64), ('modifier', np.float64), ('exp_timestamp', np.float64)])
+            elif this_length == 3:
+                self.event_type_dictionary = np.dtype([('EL_timestamp', np.float64), ('event_type', np.float64), ('exp_timestamp', np.float64)])
+            elif this_length == 2:
+                self.event_type_dictionary = np.dtype([('EL_timestamp', np.float64), ('exp_timestamp', np.float64)])
+
     def read_key_events_win(self,
         key_re = 'MSG\t([\d\.]+)\ttrial X event \<Event\((\d)-Key(.*?) {\'key\': (\d+)(, \'unicode\': u\'l\',|,) \'mod\': (\d+)}\)\> at (\d+.\d)'):
         """read_key_events reads experimental events from the message file"""

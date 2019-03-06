@@ -432,7 +432,7 @@ class EyeSignalOperator(Operator):
         self.logger.info('Interpolating blinks using interpolate_blinks')
         # set all missing data to 0:
         self.raw_pupil[self.raw_pupil<1] = 0
-        
+
         # blinks to work with -- preferably eyelink!
         if hasattr(self, 'eyelink_blink_data'):
             for i in range(len(self.blink_starts_EL)):
@@ -675,6 +675,9 @@ class EyeSignalOperator(Operator):
 
     def regress_blinks(self, interval=7, regress_blinks=True, regress_sacs=True, regress_xy=False, use_standard_blinksac_kernels=True):
         
+        # from IPython import embed
+        # embed()
+
         # only regress out blinks within these limits:
         early_cutoff = 25
         late_cutoff = interval
