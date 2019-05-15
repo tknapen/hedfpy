@@ -318,7 +318,7 @@ class HDFEyeOperator(Operator):
     def data_frame_to_hdf(self, alias, name, data_frame):
         """docstring for data_frame_to_hdf"""
         with pd.HDFStore(self.input_object) as h5_file:
-            h5_file.put("/%s/%s"%(alias, name), data_frame)
+            h5_file.put("/%s/%s"%(alias, name), data_frame, format='table')
     
     #
     #    we also have to get the data from the hdf5 file. 
