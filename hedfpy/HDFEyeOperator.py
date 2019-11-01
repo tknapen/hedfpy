@@ -144,7 +144,9 @@ class HDFEyeOperator(Operator):
         if hasattr(self.edf_operator, 'saccades_from_message_file'):
             # create a table for the saccades from the eyelink of this run's trials
             self.add_table_to_hdf(thisRunGroup, self.edf_operator.saccade_type_dictionary, self.edf_operator.saccades_from_message_file, 'saccades_from_message_file')
+        if hasattr(self.edf_operator, 'blinks_from_message_file'):
             self.add_table_to_hdf(thisRunGroup, self.edf_operator.blink_type_dictionary, self.edf_operator.blinks_from_message_file, 'blinks_from_message_file')
+        if hasattr(self.edf_operator, 'fixations_from_message_file'):
             self.add_table_to_hdf(thisRunGroup, self.edf_operator.fixation_type_dictionary, self.edf_operator.fixations_from_message_file, 'fixations_from_message_file')
 
         # first close the hdf5 file to write to it with pandas
@@ -227,14 +229,17 @@ class HDFEyeOperator(Operator):
                     eye_dict = {'timepoints':bdf.time, 'gaze_X':gazeX, 'gaze_Y':gazeY, 'pupil':pupil,}
 
                     # create instance of class EyeSignalOperator, and include the blink data as detected by the Eyelink 1000:
-                    if hasattr(self.edf_operator, 'blinks_from_message_file'):
+                    if hasattr(self.edf_operator, 'blinks_from_message_file') and hasattr(self.edf_operator, 'saccades_from_message_file'):
                         blink_dict = self.read_session_data(alias, 'blinks_from_message_file')
                         blink_dict[blink_dict['eye'] == eye]
                         sac_dict = self.read_session_data(alias, 'saccades_from_message_file')
                         sac_dict[sac_dict['eye'] == eye]
-                        eso = EyeSignalOperator(input_object=eye_dict, eyelink_blink_data=blink_dict, eyelink_sac_data=sac_dict, sample_rate=sample_rate,)
+                        eso = EyeSignalOperator(input_object=eye_dict, eyelink_blink_data=blink_dict, eyelink_sac_data=sac_dict, sample_rate=sample_rate)
                     else:
+                        self.logger.warning('No blinks and/or saccades found in %s for group  %s to %s, proceeding without regression of blinks and saccades' % (os.path.split(self.edf_operator.input_file_name)[-1], alias, self.input_object))
                         eso = EyeSignalOperator(input_object=eye_dict, sample_rate=sample_rate)
+                        regress_sacs = False
+                        regress_blinks = False
 
                     # interpolate blinks:
                     eso.interpolate_blinks(method='linear')
@@ -248,11 +253,11 @@ class HDFEyeOperator(Operator):
                     # eso.dt_pupil(dtype='bp_filt_pupil')
 
                     # regress blink and saccade responses
-                    # try:
-                    eso.regress_blinks(regress_blinks=regress_blinks, regress_sacs=regress_sacs, regress_xy=regress_xy, use_standard_blinksac_kernels=use_standard_blinksac_kernels)
-                    # except:
-                    #     eso.lp_filt_pupil_clean = eso.lp_filt_pupil.copy()
-                    #     eso.bp_filt_pupil_clean = eso.bp_filt_pupil.copy()
+                    try:
+                        eso.regress_blinks(regress_blinks=regress_blinks, regress_sacs=regress_sacs, regress_xy=regress_xy, use_standard_blinksac_kernels=use_standard_blinksac_kernels)
+                    except:
+                        eso.lp_filt_pupil_clean = eso.lp_filt_pupil.copy()
+                        eso.bp_filt_pupil_clean = eso.bp_filt_pupil.copy()
 
                     # add to existing dataframe:
                     bdf[eye+'_interpolated_timepoints'] = eso.interpolated_time_points
@@ -291,8 +296,11 @@ class HDFEyeOperator(Operator):
                         bdf[eye+'_pupil_bp_clean_psc'] = eso.bp_filt_pupil_clean_psc
 
                     # save summary plot:
-                    fig = eso.summary_plot()
-                    fig.savefig(os.path.join(os.path.split(self.input_object)[0], 'preprocess_{}_{}_{}.pdf'.format(alias, i, eye)))
+                    try:
+                        fig = eso.summary_plot()
+                        fig.savefig(os.path.join(os.path.split(self.input_object)[0], 'preprocess_{}_{}_{}.pdf'.format(alias, i, eye)))
+                    except:
+                        pass
 
                     # try time-frequency decomposition of the baseline signal
                     try:

@@ -454,6 +454,8 @@ class EDFOperator( Operator ):
             self.fixation_type_dictionary = np.dtype([(s , np.array(self.fixations_from_message_file[0][s]).dtype) for s in self.fixations_from_message_file[0].keys()])
             if len(self.blinks_from_message_file) > 0:
                 self.blink_type_dictionary = np.dtype([(s , np.array(self.blinks_from_message_file[0][s]).dtype) for s in self.blinks_from_message_file[0].keys()])
+            else:
+                del self.blinks_from_message_file
 
     def read_sound_events(self,
         sound_re = 'MSG\t([\d\.]+)\treward (\d+) at (\d+.\d)'):
