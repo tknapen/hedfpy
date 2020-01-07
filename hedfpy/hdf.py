@@ -294,7 +294,8 @@ class HDFEyeOperator(Operator):
                     try:
                         fig = eso.summary_plot()
                         fig.savefig(os.path.join(os.path.split(self.input_object)[0], 'preprocess_{}_{}_{}.pdf'.format(alias, i, eye)))
-                    except:
+                    except Exception as e:
+                        print('Could not save plot due to: {}'.format(e))
                         pass
 
                     # try time-frequency decomposition of the baseline signal
