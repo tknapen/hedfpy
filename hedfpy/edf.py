@@ -19,10 +19,8 @@ import scipy as sp
 
 from itertools import chain
 
-from CommandLineOperator import EDF2ASCOperator
-from Operator import Operator
-
-from IPython import embed as shell
+from .commandline import EDF2ASCOperator
+from .operator import Operator
 
 class EDFOperator( Operator ):
     """

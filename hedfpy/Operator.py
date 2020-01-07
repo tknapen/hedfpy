@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # encoding: utf-8
 """
-Operator.py
+operator.py
 
 Created by Tomas Knapen on 2010-09-17.
 Copyright (c) 2010 __MyCompanyName__. All rights reserved.
@@ -10,8 +10,7 @@ Copyright (c) 2010 __MyCompanyName__. All rights reserved.
 import tempfile
 import logging
 import numpy as np
-from log import *
-
+from .log import loggingLevelSetup, logging_handlers
 
 class Operator(object):
     def __init__(self, input_object, **kwargs):
