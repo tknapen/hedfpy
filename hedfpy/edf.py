@@ -65,7 +65,7 @@ class EDFOperator( Operator ):
         # optimize this so that it doesn't delete the periods in the float time, for example.
         # first clean out those C and R occurrences. No letters allowed.
         gaze_string = re.sub(re.compile('[A-Z]+'), '', gaze_string)
-        gaze_string = re.sub(re.compile('\t+\.+'), '', gaze_string)
+        gaze_string = re.sub(re.compile('[ \t]+[\.A-Z]+\n'), '\n', gaze_string)
         # # check for these really weird character shit in the final columns of the output.
         # self.workingStringClean = re.sub(re.compile('C.'), '', self.workingStringClean)
 
