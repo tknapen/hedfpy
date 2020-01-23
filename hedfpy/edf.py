@@ -19,10 +19,8 @@ import scipy as sp
 
 from itertools import chain
 
-from CommandLineOperator import EDF2ASCOperator
-from Operator import Operator
-
-from IPython import embed as shell
+from .commandline import EDF2ASCOperator
+from .operator import Operator
 
 class EDFOperator( Operator ):
     """
@@ -67,7 +65,7 @@ class EDFOperator( Operator ):
         # optimize this so that it doesn't delete the periods in the float time, for example.
         # first clean out those C and R occurrences. No letters allowed.
         gaze_string = re.sub(re.compile('[A-Z]+'), '', gaze_string)
-        gaze_string = re.sub(re.compile('\t+\.+'), '', gaze_string)
+        gaze_string = re.sub(re.compile('[ \t]+[\.A-Z]+\n'), '\n', gaze_string)
         # # check for these really weird character shit in the final columns of the output.
         # self.workingStringClean = re.sub(re.compile('C.'), '', self.workingStringClean)
 
@@ -503,4 +501,23 @@ class EDFOperator( Operator ):
                 self.logger.info('found data from block %i of shape %s'%(i, str(block['block_data'].shape)))
 
 
+    def read_generic_events(self,
+        regexpr = 'MSG\t([\d\.]+)\t(.+)'):
+        """
+        Read generic events.
+        Example:
+        MSG    1885375.0    this_is_an_event not from the KnapenLab
+        """
+        self.logger.info('reading generic events from %s', os.path.split(self.message_file)[-1])
+        self.get_message_string()
+        if not hasattr(self, 'nr_trials'):
+            self.read_trials()
 
+        messages = []
+        this_length = 0
+        message_strings = re.findall(re.compile(regexpr), self.message_string)
+        
+        messages.append([{'EL_timestamp':float(m[0]), 'message':m[1]} for m in message_strings])
+        self.messages = list(chain.from_iterable(messages))
+
+        return self.messages

@@ -12,11 +12,9 @@ import scipy as sp
 from tables import *
 import pandas as pd
 
-from EDFOperator import EDFOperator
-from Operator import Operator
-from EyeSignalOperator import EyeSignalOperator, detect_saccade_from_data
-
-from IPython import embed as shell
+from .edf import EDFOperator
+from .operator import Operator
+from .eyesignal import EyeSignalOperator, detect_saccade_from_data
 
 class HDFEyeOperator(Operator):
     """
@@ -194,8 +192,6 @@ class HDFEyeOperator(Operator):
         markers indicating that variable's peaks (stored in pdf files named 'blink_interpolation_2_'[...])
         """
 
-        # shell()
-
         if not hasattr(self, 'edf_operator'):
             self.add_edf_file(edf_file_name = alias)
 
@@ -207,7 +203,6 @@ class HDFEyeOperator(Operator):
         #    gaze data in blocks
         #
         with pd.HDFStore(self.input_object) as h5_file:
-            # shell()
             # recreate the non-gaze data for the block, that is, its sampling rate, eye of origin etc.
             blocks_data_frame = pd.DataFrame([dict([[i,self.edf_operator.blocks[j][i]] for i in self.edf_operator.blocks[0].keys() if i not in ('block_data', 'data_columns')]) for j in range(len(self.edf_operator.blocks))])
             h5_file.put("/%s/blocks"%alias, blocks_data_frame)
@@ -299,7 +294,8 @@ class HDFEyeOperator(Operator):
                     try:
                         fig = eso.summary_plot()
                         fig.savefig(os.path.join(os.path.split(self.input_object)[0], 'preprocess_{}_{}_{}.pdf'.format(alias, i, eye)))
-                    except:
+                    except Exception as e:
+                        print('Could not save plot due to: {}'.format(e))
                         pass
 
                     # try time-frequency decomposition of the baseline signal
