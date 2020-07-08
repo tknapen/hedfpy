@@ -394,7 +394,7 @@ class EyeSignalOperator(Operator):
     """
     def __init__(self, input_object, **kwargs):
         """input_object is a dictionary with timepoints, gaze_X, and gaze_Y and pupil keys and timeseries as values"""
-        super(EyeSignalOperator, self).__init__(input_object = input_object, **kwargs)
+        super().__init__(input_object = input_object, **kwargs)
         self.timepoints = np.array(self.input_object['timepoints']).squeeze()
         self.raw_gaze_X = np.array(self.input_object['gaze_X']).squeeze()
         self.raw_gaze_Y = np.array(self.input_object['gaze_Y']).squeeze()

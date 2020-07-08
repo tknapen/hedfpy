@@ -33,7 +33,7 @@ class HDFEyeOperator(Operator):
     """
 
     def __init__(self, input_object, **kwargs):
-        super(HDFEyeOperator, self).__init__(
+        super().__init__(
             input_object=input_object, **kwargs)
         """input_object is the name of the hdf5 file that this operator will create"""
 

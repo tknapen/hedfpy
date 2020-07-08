@@ -43,7 +43,7 @@ class CommandLineOperator(Operator):
         """
         CommandLineOperator can take a Nii file as input but will use only the variable input_file_name
         """
-        super(CommandLineOperator, self).__init__(
+        super().__init__(
             input_object=input_object, **kwargs)
 
         if self.input_object.__class__.__name__ == 'NiftiImage':
@@ -93,7 +93,7 @@ class EDF2ASCOperator(CommandLineOperator):
     """
 
     def __init__(self, input_object, **kwargs):
-        super(EDF2ASCOperator, self).__init__(
+        super().__init__(
             input_object=input_object, cmd='edf2asc', **kwargs)
 
     def configure(self, gazeOutputFileName=None, messageOutputFileName=None, settings=' -t -ftime -y -z -v '):
