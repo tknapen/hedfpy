@@ -7,10 +7,27 @@ Created by Tomas Knapen on 2010-09-17.
 Copyright (c) 2010 __MyCompanyName__. All rights reserved.
 """
 
+import sys
 import tempfile
 import logging
 import numpy as np
-from log import *
+
+# logging...
+logFormat = logging.Formatter(
+    "%(asctime)s - %(levelname)s - %(name)s - %(message)s", "%y-%m-%d_%H-%M-%S")
+logging_handlers = [logging.StreamHandler(sys.stdout)]
+logging_levels = [logging.DEBUG]
+
+
+def addLoggingHandler(handler, loggingLevel=logging.DEBUG):
+    logging_handlers.append(handler)
+    logging_levels.append(loggingLevel)
+
+
+def loggingLevelSetup():
+    for (handler, level) in zip(logging_handlers, logging_levels):
+        handler.setLevel(level)
+        handler.setFormatter(logFormat)
 
 
 class Operator(object):

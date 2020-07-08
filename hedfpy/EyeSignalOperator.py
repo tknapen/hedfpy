@@ -23,7 +23,7 @@ from scipy.signal import butter, lfilter, filtfilt, fftconvolve, resample
 import scipy.interpolate as interpolate
 import scipy.stats as stats
 
-from Operator import Operator
+from .Operator import Operator
 
 from IPython import embed as shell
 
