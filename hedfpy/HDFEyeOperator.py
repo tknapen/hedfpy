@@ -235,7 +235,7 @@ class HDFEyeOperator(Operator):
             if not 'block_data' in self.edf_operator.blocks[0].keys():
                 self.edf_operator.take_gaze_data_for_blocks()
             for i, block in enumerate(self.edf_operator.blocks):
-                bdf = pd.DataFrame(block['block_data'],
+                bdf = pd.DataFrame(block['block_data'][:,:len(block['data_columns'])],
                                    columns=block['data_columns'])
 
                 #

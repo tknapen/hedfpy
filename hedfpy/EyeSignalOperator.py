@@ -683,9 +683,9 @@ class EyeSignalOperator(Operator):
         late_cutoff = interval
 
         self.logger.info('Regressing blinks, saccades and gaze position of pupil signals')
-
+        
         # params:
-        x = np.linspace(0, interval, interval * self.sample_rate, endpoint=False)
+        x = np.linspace(0, interval, int(interval * self.sample_rate), endpoint=False)
 
         # blink events:
         blinks = self.blink_ends # defined in samples

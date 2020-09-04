@@ -561,12 +561,10 @@ class EDFOperator(Operator):
         # check for gaze data and blocks
         self.clean_gaze_information()
         self.identify_blocks()
-
         with open(self.gaze_file) as gfd:
             txt_data = gfd.readlines()
-            float_data = [[float(i) for i in line.split('\t')]
-                          for line in txt_data]
-
+            float_data = [[float(i.split(' .')[0]) for i in line.split('\t')]
+                        for line in txt_data]
             for i, block in enumerate(self.blocks):
                 block_data = float_data[block['block_start_index']                                        :block['block_end_index']]
                 block['block_data'] = np.array(block_data, dtype=np.float32)
