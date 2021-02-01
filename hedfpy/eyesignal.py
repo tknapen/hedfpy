@@ -210,9 +210,9 @@ def detect_saccade_from_data(xy_data = None, vel_data = None, l = 5, sample_rate
 
         try:
             this_saccade = {
-                'expanded_start_time': expanded_saccade_start,
-                'expanded_end_time': expanded_saccade_end,
-                'expanded_duration': expanded_saccade_end - expanded_saccade_start,
+                'expanded_start_time': expanded_saccade_start / sample_rate * 1000,
+                'expanded_end_time': expanded_saccade_end / sample_rate * 1000,
+                'expanded_duration': (expanded_saccade_end - expanded_saccade_start) / sample_rate * 1000.,
                 'expanded_start_point': xy_data[expanded_saccade_start],
                 'expanded_end_point': xy_data[expanded_saccade_end],
                 'expanded_vector': xy_data[expanded_saccade_end] - xy_data[expanded_saccade_start],

@@ -442,15 +442,13 @@ class HDFEyeOperator(Operator):
         if requested_eye is None:
             requested_eye = recorded_eye
 
-        sample_rate = self.sample_rate_during_period(time_period, alias)
-
         xy_data = self.signal_during_period(time_period = time_period, alias = alias, signal = 'gaze', requested_eye = requested_eye)
         vel_data = self.signal_during_period(time_period = time_period, alias = alias, signal = 'vel', requested_eye = requested_eye)
-        saccades = detect_saccade_from_data(xy_data = xy_data, vel_data = vel_data, l = l, sample_rate = sample_rate)
+        saccades = detect_saccade_from_data(xy_data = xy_data, vel_data = vel_data, l = l, sample_rate = self.sample_rate_during_period(time_period, alias))
         saccades = pd.DataFrame(saccades)
 
-        saccades['start_timestamp'] = (saccades['expanded_start_time'])  + time_period[0]
-        saccades['end_timestamp'] = (saccades['expanded_end_time'])  + time_period[0]
+        saccades['start_timestamp'] = saccades['expanded_start_time']  + time_period[0]
+        saccades['end_timestamp'] = saccades['expanded_end_time']  + time_period[0]
 
         return saccades
 
