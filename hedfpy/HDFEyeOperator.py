@@ -315,11 +315,9 @@ class HDFEyeOperator(Operator):
                         bdf[eye+'_pupil_bp_clean_zscore'] = eso.bp_filt_pupil_clean_zscore
                     if normalization == 'psc':
                         eso.percent_signal_change_pupil(dtype='lp_filt_pupil')
-                        eso.percent_signal_change_pupil(
-                            dtype='lp_filt_pupil_clean')
+                        eso.percent_signal_change_pupil(dtype='lp_filt_pupil_clean')
                         eso.percent_signal_change_pupil(dtype='bp_filt_pupil')
-                        eso.percent_signal_change_pupil(
-                            dtype='bp_filt_pupil_clean')
+                        eso.percent_signal_change_pupil(dtype='bp_filt_pupil_clean')
                         bdf[eye+'_pupil_lp_psc'] = eso.lp_filt_pupil_psc
                         bdf[eye+'_pupil_lp_clean_psc'] = eso.lp_filt_pupil_clean_psc
                         bdf[eye+'_pupil_bp_psc'] = eso.bp_filt_pupil_psc
@@ -327,9 +325,8 @@ class HDFEyeOperator(Operator):
 
                     # save summary plot:
                     try:
-                        fig = eso.summary_plot()
-                        fig.savefig(os.path.join(os.path.split(self.input_object)[
-                                    0], 'preprocess_{}_{}_{}.pdf'.format(alias, i, eye)))
+                        fig = eso.summary_plot(alias=alias, i=i, eye=eye)
+                        fig.savefig(os.path.join(os.path.split(self.input_object)[0], 'preprocess_{}_{}_{}.pdf'.format(alias, i, eye)))
                     except:
                         pass
 
@@ -343,15 +340,12 @@ class HDFEyeOperator(Operator):
                             cycle_buffer=cycle_buffer_filterbank,
                             tf_decomposition=tf_decomposition_filterbank,
                         )
-                        self.logger.info(
-                            'Performed T-F analysis of type %s' % tf_decomposition_filterbank)
+                        self.logger.info('Performed T-F analysis of type %s' % tf_decomposition_filterbank)
                         for freq in eso.band_pass_filter_bank_pupil.keys():
-                            bdf[eye+'_pupil_filterbank_bp_%2.5f' %
-                                freq] = eso.band_pass_filter_bank_pupil[freq]
+                            bdf[eye+'_pupil_filterbank_bp_%2.5f' % freq] = eso.band_pass_filter_bank_pupil[freq]
                             self.logger.info('Saved T-F analysis %2.5f' % freq)
                     except:
-                        self.logger.error(
-                            'Something went wrong with T-F analysis of type %s' % tf_decomposition_filterbank)
+                        self.logger.error('Something went wrong with T-F analysis of type %s' % tf_decomposition_filterbank)
                         pass
 
                 # put in HDF5:
@@ -387,8 +381,7 @@ class HDFEyeOperator(Operator):
     def eye_during_period(self, time_period, alias):
         """eye_during_period returns the identity of the eye that was recorded during a given period"""
         with pd.HDFStore(self.input_object) as h5_file:
-            period_block_nr = self.sample_in_block(
-                sample=time_period[0], block_table=h5_file['%s/blocks' % alias])
+            period_block_nr = self.sample_in_block(sample=time_period[0], block_table=h5_file['%s/blocks' % alias])
             eye = h5_file['%s/blocks' % alias]['eye_recorded'][period_block_nr]
         return eye
 
@@ -407,18 +400,21 @@ class HDFEyeOperator(Operator):
                 sample=time_period[0], block_table=h5_file['%s/blocks' % alias])
             return h5_file['%s/blocks' % alias]['sample_rate'][period_block_nr]
 
-    def sample_rate_during_period(self, time_period, alias):
+    # def sample_rate_during_period(self, time_period, alias):
+    #
+    #     block = self.block_for_time_period(alias, time_period)
+    #
+    #     return self.block_properties(alias, block).sample_rate
 
-        block = self.block_for_time_period(alias, time_period)
+    def sample_rate_during_period(self, alias):
 
-        return self.block_properties(alias, block).sample_rate
+        return self.block_properties(alias).sample_rate[0]
 
     def sample_rate_during_trial(self, trial_nr, alias):
         """docstring for signal_from_trial"""
         with pd.HDFStore(self.input_object) as h5_file:
             table = h5_file['%s/trials' % alias]
-            time_period = np.array(table[table['trial_start_index'] == trial_nr][[
-                                   'trial_start_EL_timestamp', 'trial_end_EL_timestamp']])
+            time_period = np.array(table[table['trial_start_index'] == trial_nr][['trial_start_EL_timestamp', 'trial_end_EL_timestamp']])
         return float(self.sample_rate_during_period(time_period[0], alias))
 
     def trial_properties(self, alias, trial=None):
@@ -428,7 +424,7 @@ class HDFEyeOperator(Operator):
         with pd.HDFStore(self.input_object) as h5_file:
             table = h5_file['%s/trials' % alias]
 
-        return table.ix[trial]
+        return table[trial]
 
     def block_properties(self, alias, block_nr=None):
         if block_nr is None:
@@ -437,7 +433,7 @@ class HDFEyeOperator(Operator):
         with pd.HDFStore(self.input_object) as h5_file:
             table = h5_file['%s/blocks' % alias]
 
-        return table.ix[block_nr]
+        return table[block_nr]
 
     def block_parameters(self, alias, block_nr=None):
         if block_nr is None:
@@ -446,9 +442,9 @@ class HDFEyeOperator(Operator):
         with pd.HDFStore(self.input_object) as h5_file:
             table = h5_file['%s/parameters' % alias]
 
-        return table.ix[block_nr]
+        return table[block_nr]
 
-    def signal_during_period(self, time_period, alias, signal, requested_eye=None):
+    def signal_during_period(self, time_period=None, alias=None, signal=None, requested_eye=None):
         """docstring for gaze_during_period"""
 
         recorded_eye = self.eye_during_period(time_period, alias)
