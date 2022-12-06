@@ -486,7 +486,7 @@ class HDFEyeOperator(Operator):
         vel_data = self.signal_during_period(
             time_period=time_period, alias=alias, signal='vel', requested_eye=requested_eye)
         saccades = detect_saccade_from_data(
-            xy_data=xy_data, vel_data=vel_data, l=l, sample_rate=self.sample_rate_during_period(time_period, alias))
+            xy_data=xy_data, vel_data=vel_data, l=l, sample_rate=self.sample_rate_during_period(alias))
         saccades = pd.DataFrame(saccades)
 
         saccades['start_timestamp'] = saccades['expanded_start_time'] + \
