@@ -218,7 +218,8 @@ class EDFOperator(Operator):
 
     def read_trials(self,
                     # start_re='MSG\t([\d\.]+)\ttrial (\d+) started at (\d+.\d)',
-                    start_re='MSG\t([\d\.]+)\tstart_type-pulse_trial-(\d+)_phase-0_key-t_time-(\d.+)',
+                    pulse_re='MSG\t([\d\.]+)\tstart_type-pulse_trial-(\d+)_phase-0_key-t_time-(\d.+)',
+                    stim_re='MSG\t([\d\.]+)\tstart_type-stim_trial-(\d+)_phase-0',
                     # stop_re='MSG\t([\d\.]+)\ttrial (\d+) stopped at (\d+.\d)',
                     # phase_re='MSG\t([\d\.]+)\ttrial X phase (\d+) started at (\d+.\d)',
                     phase_re = 'MSG\t([\d\.]+)\tstart_type-stim_trial-XXX_phase-(\d+)',
@@ -241,14 +242,20 @@ class EDFOperator(Operator):
         #
         # read the trials themselves
         #
-        self.start_trial_strings = re.findall(re.compile(start_re), self.message_string)
-        print(self.start_trial_strings)
+        self.start_trial_strings = re.findall(re.compile(pulse_re), self.message_string)
+
+        if len(self.start_trial_strings) == 0:
+            self.start_trial_strings = re.findall(re.compile(stim_re), self.message_string)
+
         # self.stop_trial_strings = re.findall(re.compile(stop_re), self.message_string)
 
         # check whether there are any trials here.
         if len(self.start_trial_strings) > 0:
 
-            self.trial_starts = np.array([[float(s[0]), int(s[1]), float(s[2])] for s in self.start_trial_strings])
+            if np.array(self.start_trial_strings).shape[-1] == 2:
+                self.trial_starts = np.array([[float(s[0]), int(s[1]), float(s[0])] for s in self.start_trial_strings])
+            else:
+                self.trial_starts = np.array([[float(s[0]), int(s[1]), float(s[2])] for s in self.start_trial_strings])
             # self.trial_ends = np.array([[float(s[0]), int(s[1]), float(s[2])] for s in self.stop_trial_strings])
             self.nr_trials = int(self.trial_starts[-1, 1])+1
 
