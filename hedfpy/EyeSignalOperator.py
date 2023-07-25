@@ -683,7 +683,7 @@ class EyeSignalOperator(Operator):
         late_cutoff = interval
 
         self.logger.info('Regressing blinks, saccades and gaze position of pupil signals')
-        
+
         # params:
         x = np.linspace(0, interval, int(interval * self.sample_rate), endpoint=False)
 
@@ -815,7 +815,7 @@ class EyeSignalOperator(Operator):
         self.lp_filt_pupil_clean = self.bp_filt_pupil_clean + self.baseline_filt_pupil
         self.bp_filt_pupil_clean = self.bp_filt_pupil_clean + self.baseline_filt_pupil.mean()
 
-    def summary_plot(self):
+    def summary_plot(self, alias=None, i=None, eye=None):
 
         import matplotlib.gridspec as gridspec
 

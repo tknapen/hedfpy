@@ -217,9 +217,12 @@ class EDFOperator(Operator):
         self.read_sound_events()
 
     def read_trials(self,
-                    start_re='MSG\t([\d\.]+)\ttrial (\d+) started at (\d+.\d)',
-                    stop_re='MSG\t([\d\.]+)\ttrial (\d+) stopped at (\d+.\d)',
-                    phase_re='MSG\t([\d\.]+)\ttrial X phase (\d+) started at (\d+.\d)',
+                    # start_re='MSG\t([\d\.]+)\ttrial (\d+) started at (\d+.\d)',
+                    pulse_re='MSG\t([\d\.]+)\tstart_type-pulse_trial-(\d+)_phase-0_key-t_time-(\d.+)',
+                    stim_re='MSG\t([\d\.]+)\tstart_type-stim_trial-(\d+)_phase-0',
+                    # stop_re='MSG\t([\d\.]+)\ttrial (\d+) stopped at (\d+.\d)',
+                    # phase_re='MSG\t([\d\.]+)\ttrial X phase (\d+) started at (\d+.\d)',
+                    phase_re = 'MSG\t([\d\.]+)\tstart_type-stim_trial-XXX_phase-(\d+)',
                     parameter_re='MSG\t[\d\.]+\ttrial X parameter[\t ]*(\S*?)\s+: ([-\d\.]*|[\w]*)'):
         """
         read_trials reads in trials from the message file,
@@ -230,32 +233,35 @@ class EDFOperator(Operator):
         when creating the hfd5 file
         """
 
-        self.logger.info('reading trials from %s',
-                         os.path.split(self.message_file)[-1])
+        self.logger.info('reading trials from %s', os.path.split(self.message_file)[-1])
         self.get_message_string()
+
+        # print("Message = {}".format(self.get_message_string()))
+        # print("Message = {}".format(self.message_string))
 
         #
         # read the trials themselves
         #
-        self.start_trial_strings = re.findall(
-            re.compile(start_re), self.message_string)
-        self.stop_trial_strings = re.findall(
-            re.compile(stop_re), self.message_string)
+        self.start_trial_strings = re.findall(re.compile(pulse_re), self.message_string)
+
+        if len(self.start_trial_strings) == 0:
+            self.start_trial_strings = re.findall(re.compile(stim_re), self.message_string)
+
+        # self.stop_trial_strings = re.findall(re.compile(stop_re), self.message_string)
 
         # check whether there are any trials here.
         if len(self.start_trial_strings) > 0:
 
-            self.trial_starts = np.array(
-                [[float(s[0]), int(s[1]), float(s[2])] for s in self.start_trial_strings])
-            self.trial_ends = np.array(
-                [[float(s[0]), int(s[1]), float(s[2])] for s in self.stop_trial_strings])
-            self.nr_trials = int(self.trial_ends[-1, 1])+1
+            if np.array(self.start_trial_strings).shape[-1] == 2:
+                self.trial_starts = np.array([[float(s[0]), int(s[1]), float(s[0])] for s in self.start_trial_strings])
+            else:
+                self.trial_starts = np.array([[float(s[0]), int(s[1]), float(s[2])] for s in self.start_trial_strings])
+            # self.trial_ends = np.array([[float(s[0]), int(s[1]), float(s[2])] for s in self.stop_trial_strings])
+            self.nr_trials = int(self.trial_starts[-1, 1])+1
 
             # remove duplicate rows:
-            self.trial_starts = np.vstack(
-                [self.trial_starts[self.trial_starts[:, 1] == t, :][0, :] for t in range(self.nr_trials)])
-            self.trial_ends = np.vstack(
-                [self.trial_ends[self.trial_ends[:, 1] == t, :][0, :] for t in range(self.nr_trials)])
+            # self.trial_starts = np.vstack([self.trial_starts[self.trial_starts[:, 1] == t, :][0, :] for t in range(self.nr_trials)])
+            # self.trial_ends = np.vstack([self.trial_ends[self.trial_ends[:, 1] == t, :][0, :] for t in range(self.nr_trials)])
 
             # # sometimes we have twice as many trial starts as trial ends!
             # if 2 * len(self.trial_starts) == len(self.trial_ends):
@@ -267,35 +273,50 @@ class EDFOperator(Operator):
             #     self.trial_ends = self.trial_ends[:len(self.trial_starts)]
 
             # self.nr_trials = len(self.trial_starts)
-            self.trials = np.hstack((self.trial_starts, self.trial_ends))
+            # self.trials = np.hstack((self.trial_starts, self.trial_ends))
+            self.trials = self.trial_starts
 
             # create a dictionary for the types of timing informations we'd like to look at
-            self.trial_type_dictionary = [('trial_start_EL_timestamp', np.float64), ('trial_start_index', np.int32), ('trial_start_exp_timestamp', np.float64), (
-                'trial_end_EL_timestamp', np.float64), ('trial_end_index', np.int32), ('trial_end_exp_timestamp', np.float64)]
+            # self.trial_type_dictionary = [('trial_start_EL_timestamp', np.float64), ('trial_start_index', np.int32), ('trial_start_exp_timestamp', np.float64), (
+            #     'trial_end_EL_timestamp', np.float64), ('trial_end_index', np.int32), ('trial_end_exp_timestamp', np.float64)]
+            self.trial_type_dictionary = [('trial_start_EL_timestamp', np.float64),
+                                          ('trial_start_index', np.int32),
+                                          ('trial_start_exp_timestamp', np.float64)]
 
-            self.trials = [{'trial_start_EL_timestamp': tr[0], 'trial_start_index': tr[1], 'trial_start_exp_timestamp': tr[2],
-                            'trial_end_EL_timestamp': tr[3], 'trial_end_index': tr[4], 'trial_end_exp_timestamp': tr[5]} for tr in self.trials]
+            # self.trials = [{'trial_start_EL_timestamp': tr[0], 'trial_start_index': tr[1], 'trial_start_exp_timestamp': tr[2],
+            #                 'trial_end_EL_timestamp': tr[3], 'trial_end_index': tr[4], 'trial_end_exp_timestamp': tr[5]} for tr in self.trials]
 
+            self.trials = [{'trial_start_EL_timestamp': tr[0], 'trial_start_index': tr[1], 'trial_start_exp_timestamp': tr[2]} for tr in self.trials]
             self.trial_type_dictionary = np.dtype(self.trial_type_dictionary)
             #
             # trial phases
             #
             self.trial_phases = []
             for i in range(self.nr_trials):
-                this_trial_re = phase_re.replace(' X ', ' ' + str(i) + ' ')
-                phase_strings = re.findall(re.compile(
-                    this_trial_re), self.message_string)
-                self.trial_phases.append(
-                    [[int(i), float(s[0]), int(s[1]), float(s[2])] for s in phase_strings])
+                this_trial_re = phase_re.replace('XXX', str(i))
+                phase_strings = re.findall(re.compile(this_trial_re), self.message_string)
+                # self.trial_phases.append([[int(i), float(s[0]), int(s[1]), float(s[2])] for s in phase_strings])
+                self.trial_phases.append([[int(i), float(s[0]), int(s[1])] for s in phase_strings])
+
             self.trial_phases = list(chain.from_iterable(self.trial_phases))
-            self.trial_phases = [{'trial_phase_trial': tr[0], 'trial_phase_EL_timestamp': tr[1],
-                                  'trial_phase_index': tr[2], 'trial_phase_exp_timestamp': tr[3]} for tr in self.trial_phases]
+            # self.trial_phases = [{'trial_phase_trial': tr[0], 'trial_phase_EL_timestamp': tr[1],
+            #                       'trial_phase_index': tr[2], 'trial_phase_exp_timestamp': tr[3]} for tr in self.trial_phases]
+
+            self.trial_phases = [{'trial_phase_trial': tr[0],
+                                  'trial_phase_EL_timestamp': tr[1],
+                                  'trial_phase_index': tr[2]}
+                                 for tr in self.trial_phases]
+
             self.nr_trial_phases = len(self.trial_phases)
 
-            self.trial_phase_type_dictionary = [('trial_phase_trial', np.float64), ('trial_phase_EL_timestamp', np.int32), (
-                'trial_phase_index', np.float64), ('trial_phase_exp_timestamp', np.float64)]
-            self.trial_phase_type_dictionary = np.dtype(
-                self.trial_phase_type_dictionary)
+            # self.trial_phase_type_dictionary = [('trial_phase_trial', np.float64), ('trial_phase_EL_timestamp', np.int32), (
+            #     'trial_phase_index', np.float64), ('trial_phase_exp_timestamp', np.float64)]
+
+            self.trial_phase_type_dictionary = [('trial_phase_trial', np.float64),
+                                                ('trial_phase_EL_timestamp', np.int32),
+                                                ('trial_phase_index', np.float64)]
+
+            self.trial_phase_type_dictionary = np.dtype(self.trial_phase_type_dictionary)
 
             # now adjust the trial type dictionary and convert into a numpy dtype
             # self.trial_type_dictionary.append(('trial_phase_timestamps', np.float64, (self.nr_phase_starts.max(), 3)))
@@ -561,10 +582,12 @@ class EDFOperator(Operator):
         # check for gaze data and blocks
         self.clean_gaze_information()
         self.identify_blocks()
+
         with open(self.gaze_file) as gfd:
             txt_data = gfd.readlines()
             float_data = [[float(i.split(' .')[0]) for i in line.split('\t')]
                         for line in txt_data]
+
             for i, block in enumerate(self.blocks):
                 block_data = float_data[block['block_start_index']                                        :block['block_end_index']]
                 block['block_data'] = np.array(block_data, dtype=np.float32)
