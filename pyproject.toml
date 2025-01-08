@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel", "numpy"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hedfpy"
+version = "0.0.dev3" # Replace this with the value dynamically loaded by `get_version`
+description = "convert SR Research eyelink edf output to tabular hdf5 format"
+readme = "README.md"
+license = { text = "GPL-3.0-or-later" }
+authors = [{ name = "Tomas Knapen", email = "tknapen@gmail.com" }]
+maintainers = [{ name = "Tomas Knapen", email = "tknapen@gmail.com" }]
+keywords = ["seaborn", "visualization", "neuroimaging", "plotting"]
+classifiers = [
+    'Intended Audience :: Science/Research',
+    'Intended Audience :: Developers',
+    'License :: OSI Approved',
+    'Programming Language :: Python',
+    'Topic :: Software Development',
+    'Topic :: Scientific/Engineering',
+    'Operating System :: POSIX',
+    'Operating System :: Unix',
+    'Operating System :: MacOS',
+]
+
+# requires-python = ">=3.7, <3.11"
+dependencies = [
+    "matplotlib",
+    "pandas",
+    "numpy",
+    "lmfit",
+    "statsmodels",
+    "scikit-learn",
+    "ipython",
+    "mne",
+    "tables",
+    "h5py",
+]
+
+
+[project.optional-dependencies]
+dev = ["pytest", "black", "flake8"]
+
+[tool.setuptools]
+packages = ["hedfpy"]
+package-data = { hedfpy = ['test/*.ipynb', 'test/*.edf'] }
