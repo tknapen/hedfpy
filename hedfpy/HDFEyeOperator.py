@@ -16,9 +16,9 @@ import scipy as sp
 from tables import *
 import pandas as pd
 
-from .EDFOperator import EDFOperator
-from .Operator import Operator
-from .EyeSignalOperator import EyeSignalOperator, detect_saccade_from_data
+from EDFOperator import EDFOperator
+from Operator import Operator
+from EyeSignalOperator import EyeSignalOperator, detect_saccade_from_data
 
 from IPython import embed as shell
 
