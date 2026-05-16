@@ -44,3 +44,13 @@ dev = ["pytest", "black", "flake8"]
 [tool.setuptools]
 packages = ["hedfpy"]
 package-data = { hedfpy = ['test/*.ipynb', 'test/*.edf'] }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# hedfpy currently triggers many third-party deprecation warnings; these
+# are tightened up as part of the modernization phase of the refactor.
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::FutureWarning",
+    "ignore::PendingDeprecationWarning",
+]

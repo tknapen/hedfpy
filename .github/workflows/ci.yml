@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [master, "refactor/**"]
+  pull_request:
+
+jobs:
+  test:
+    name: pytest (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      # Don't cancel the whole matrix when one version fails: during the
+      # modernization refactor it is useful to see exactly which Python
+      # versions still need work.
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install hedfpy and test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      # SR Research's edf2asc binary is not available on CI runners; the
+      # test fixture ships pre-converted .msg/.gaz files so the suite does
+      # not need it.
+      - name: Run test suite
+        run: pytest -v
