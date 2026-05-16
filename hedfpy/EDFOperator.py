@@ -8,25 +8,15 @@ Copyright (c) 2010 VU. All rights reserved.
 """
 
 import os
-import sys
-import subprocess
 import re
-import tempfile
-import logging
-import pickle
-from datetime import *
-
-from math import *
-import numpy as np
-import matplotlib.pylab as pl
-import scipy as sp
-
+import subprocess
+from datetime import datetime
 from itertools import chain
+
+import numpy as np
 
 from .CommandLineOperator import EDF2ASCOperator
 from .Operator import Operator
-
-from IPython import embed as shell
 
 
 class EDFOperator(Operator):
@@ -74,12 +64,12 @@ class EDFOperator(Operator):
         # optimize this so that it doesn't delete the periods in the float time, for example.
         # first clean out those C and R occurrences. No letters allowed.
         gaze_string = re.sub(re.compile('[A-Z]+'), '', gaze_string)
-        gaze_string = re.sub(re.compile('\t+\.+'), '', gaze_string)
+        gaze_string = re.sub(re.compile(r'\t+\.+'), '', gaze_string)
         # # check for these really weird character shit in the final columns of the output.
         # self.workingStringClean = re.sub(re.compile('C.'), '', self.workingStringClean)
 
         # compress the older, non-clean, gaze file
-        os.system('gzip "' + self.gaze_file + '"')
+        subprocess.run(['gzip', self.gaze_file], check=True)
 
         of = open(self.gaze_file, 'w')
         of.write(gaze_string)
@@ -100,7 +90,7 @@ class EDFOperator(Operator):
                          self.message_file)
 
         with open(self.message_file, 'r') as mfd:
-            self.header = ''.join([mfd.next() for x in xrange(10)])
+            self.header = ''.join([next(mfd) for _ in range(10)])
         date_string = ' '.join([h for h in self.header.split(
             '\n')[1].split(' ') if h not in ('', '**', 'DATE:')][1:])
         self.recording_datetime = datetime.strptime(

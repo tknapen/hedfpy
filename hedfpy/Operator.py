@@ -40,8 +40,11 @@ class Operator(object):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.logger.setLevel(logging.DEBUG)
         loggingLevelSetup()
-        for handler in logging_handlers:
-            self.logger.addHandler(handler)
+        # getLogger returns a shared instance per name; only attach handlers
+        # once so repeated Operator construction doesn't duplicate log lines.
+        if not self.logger.handlers:
+            for handler in logging_handlers:
+                self.logger.addHandler(handler)
 
     def configure(self):
         """

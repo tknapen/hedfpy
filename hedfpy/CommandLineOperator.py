@@ -10,17 +10,9 @@ Copyright (c) 2010 __MyCompanyName__. All rights reserved.
 import os
 import sys
 import subprocess
-import shutil
 import tempfile
-import logging
-import re
-import scipy as sp
-import numpy as np
-import matplotlib.pylab as pl
-from IPython import embed as shell
 
-from .Operator import *
-# from log import *
+from .Operator import Operator
 
 # Execute program in shell:
 
@@ -130,8 +122,8 @@ class EDF2ASCOperator(CommandLineOperator):
         else:
             self.gazcmd = self.intermediatecmd + '-s -miss 0.0001 -vel "'+self.input_file_name+'"; mv ' + '"' + \
                 standardOutputFileName.replace(
-                    '|', '\|') + '" "' + self.gazeOutputFileName.replace('|', '\|') + '"'
+                    '|', r'\|') + '" "' + self.gazeOutputFileName.replace('|', r'\|') + '"'
             self.msgcmd = self.intermediatecmd + '-e "'+self.input_file_name+'"; mv ' + '"' + \
                 standardOutputFileName.replace(
-                    '|', '\|') + '" "' + self.messageOutputFileName.replace('|', '\|') + '"'
+                    '|', r'\|') + '" "' + self.messageOutputFileName.replace('|', r'\|') + '"'
             self.runcmd = self.gazcmd + '; ' + self.msgcmd

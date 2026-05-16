@@ -10,22 +10,16 @@ Copyright (c) 2010 __MyCompanyName__. All rights reserved.
 More details.
 """
 
-import os, sys, subprocess, re
-import pickle
-
 import scipy as sp
 import numpy as np
 import pandas as pd
 import numpy.linalg as LA
 import matplotlib.pyplot as plt
-from math import *
-from scipy.signal import butter, lfilter, filtfilt, fftconvolve, resample
+from scipy.signal import butter, filtfilt, fftconvolve
 import scipy.interpolate as interpolate
 import scipy.stats as stats
 
 from .Operator import Operator
-
-from IPython import embed as shell
 
 def _butter_lowpass(data, highcut, fs, order=5):
     nyq = 0.5 * fs
@@ -135,12 +129,8 @@ def detect_saccade_from_data(xy_data = None, vel_data = None, l = 5, sample_rate
 
     scaled_vel_data = vel_data/np.mean(np.array(np.sqrt((vel_data - med)**2)), axis = 0)
     # normalize and to acceleration and its sign
-    if (float(np.__version__.split('.')[1]) == 1.0) and (float(np.__version__.split('.')[1]) > 6):
-        normed_scaled_vel_data = LA.norm(scaled_vel_data, axis = 1)
-        normed_vel_data = LA.norm(vel_data, axis = 1)
-    else:
-        normed_scaled_vel_data = np.array([LA.norm(svd) for svd in np.array(scaled_vel_data)])
-        normed_vel_data = np.array([LA.norm(vd) for vd in np.array(vel_data)])
+    normed_scaled_vel_data = LA.norm(scaled_vel_data, axis=1)
+    normed_vel_data = LA.norm(vel_data, axis=1)
     normed_acc_data = np.r_[0,np.diff(normed_scaled_vel_data)]
     signed_acc_data = np.sign(normed_acc_data)
 
@@ -231,8 +221,7 @@ def detect_saccade_from_data(xy_data = None, vel_data = None, l = 5, sample_rate
         except IndexError:
             pass
 
-
-    # if this fucker was empty
+    # if no valid saccades were found
     if len(valid_threshold_crossing_indices) == 0:
         this_saccade = {
             'expanded_start_time': 0,
@@ -254,7 +243,6 @@ def detect_saccade_from_data(xy_data = None, vel_data = None, l = 5, sample_rate
         }
         saccades.append(this_saccade)
 
-    # shell()
     return saccades
 
 def detect_peaks(x, mph=None, mpd=1, threshold=0, edge='rising', kpsh=False, valley=False, show=False, ax=None):
@@ -597,21 +585,27 @@ class EyeSignalOperator(Operator):
         zscore_pupil takes z-score of the dtype pupil signal, and internalizes it as a dtype + '_zscore' self variable.
         """
 
-        exec('self.' + str(dtype) + '_zscore = (self.' + str(dtype) + ' - np.mean(self.' + str(dtype) + ')) / np.std(self.' + str(dtype) + ')')
+        values = getattr(self, dtype)
+        setattr(self, dtype + '_zscore',
+                (values - np.mean(values)) / np.std(values))
 
     def percent_signal_change_pupil(self, dtype = 'bp_filt_pupil'):
         """
         percent_signal_change_pupil takes percent signal change of the dtype pupil signal, and internalizes it as a dtype + '_psc' self variable.
         """
 
-        exec('self.{}_psc = ((self.{} - self.{}.mean()) / np.mean(self.baseline_filt_pupil[500:-500])) * 100'.format(dtype, dtype, dtype))
+        values = getattr(self, dtype)
+        baseline = np.mean(self.baseline_filt_pupil[500:-500])
+        setattr(self, dtype + '_psc',
+                ((values - values.mean()) / baseline) * 100)
 
     def dt_pupil(self, dtype = 'bp_filt_pupil'):
         """
         dt_pupil takes the temporal derivative of the dtype pupil signal, and internalizes it as a dtype + '_dt' self variable.
         """
 
-        exec('self.' + str(dtype) + '_dt = np.r_[0, np.diff(self.' + str(dtype) + ')]' )
+        values = getattr(self, dtype)
+        setattr(self, dtype + '_dt', np.r_[0, np.diff(values)])
 
     def time_frequency_decomposition_pupil(self,
                                            minimal_frequency = 0.0025,
@@ -674,9 +668,6 @@ class EyeSignalOperator(Operator):
 
 
     def regress_blinks(self, interval=7, regress_blinks=True, regress_sacs=True, regress_xy=False, use_standard_blinksac_kernels=True):
-
-        # from IPython import embed
-        # embed()
 
         # only regress out blinks within these limits:
         early_cutoff = 25
@@ -797,9 +788,10 @@ class EyeSignalOperator(Operator):
             regs_titles.append('gaze_y')
         print([r.shape for r in regs])
 
-        # GLM:
-        design_matrix = np.matrix(np.vstack([reg for reg in regs])).T
-        betas = np.array(((design_matrix.T * design_matrix).I * design_matrix.T) * np.matrix(self.bp_filt_pupil).T).ravel()
+        # GLM (ordinary least squares: betas = (X'X)^-1 X'y):
+        design_matrix = np.vstack([reg for reg in regs]).T
+        gram = design_matrix.T @ design_matrix
+        betas = (np.linalg.inv(gram) @ design_matrix.T @ self.bp_filt_pupil).ravel()
         explained = np.sum(np.vstack([betas[i]*regs[i] for i in range(len(betas))]), axis=0)
 
         rsq = sp.stats.pearsonr(self.bp_filt_pupil, explained)

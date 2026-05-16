@@ -1,26 +1,13 @@
 import os
-import sys
-import subprocess
-import re
-import tempfile
-import logging
-import pickle
-from datetime import *
 import warnings
 
-from math import *
 import numpy as np
-import numpy.linalg as LA
-import matplotlib.pylab as pl
-import scipy as sp
-from tables import *
 import pandas as pd
+from tables import open_file
 
 from .EDFOperator import EDFOperator
 from .Operator import Operator
 from .EyeSignalOperator import EyeSignalOperator, detect_saccade_from_data
-
-from IPython import embed as shell
 
 
 class HDFEyeOperator(Operator):
@@ -211,8 +198,6 @@ class HDFEyeOperator(Operator):
         markers indicating that variable's peaks (stored in pdf files named 'blink_interpolation_2_'[...])
         """
 
-        # shell()
-
         if not hasattr(self, 'edf_operator'):
             self.add_edf_file(edf_file_name=alias)
 
@@ -225,7 +210,6 @@ class HDFEyeOperator(Operator):
         #    gaze data in blocks
         #
         with pd.HDFStore(self.input_object) as h5_file:
-            # shell()
             # recreate the non-gaze data for the block, that is, its sampling rate, eye of origin etc.
             blocks_data_frame = pd.DataFrame([dict([[i, self.edf_operator.blocks[j][i]] for i in self.edf_operator.blocks[0].keys(
             ) if i not in ('block_data', 'data_columns')]) for j in range(len(self.edf_operator.blocks))])
