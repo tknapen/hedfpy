@@ -19,12 +19,15 @@ class HDFEyeOperator(Operator):
     HDFEyeOperator object
     """
 
-    def __init__(self, input_object, **kwargs):
-        super().__init__(
-            input_object=input_object, **kwargs)
-        """input_object is the name of the hdf5 file that this operator will create"""
+    def __init__(self, input_object, grammar=None, **kwargs):
+        """input_object is the name of the hdf5 file that this operator
+        will create. grammar, if given, is a MessageGrammar used as the
+        default when parsing edf files added to this session; individual
+        add_edf_file calls can still override it."""
+        super().__init__(input_object=input_object, **kwargs)
+        self.grammar = grammar
 
-    def add_edf_file(self, edf_file_name):
+    def add_edf_file(self, edf_file_name, grammar=None):
         """
         add_edf_file is the first step in adding a run's edf data
         to the sessions hdf5 file indicated by self.input_object
@@ -38,9 +41,14 @@ class HDFEyeOperator(Operator):
         and stoprecording) into a separate internal variable of the EDFOperator object.
         Putting these data into a hdf5 file is not done here, but in
         self.edf_message_data_to_hdf and self.edf_gaze_data_to_hdf
+
+        grammar, if given, is a MessageGrammar overriding the grammar
+        passed to this HDFEyeOperator (if any) for this edf file only.
         """
 
-        self.edf_operator = EDFOperator(edf_file_name)
+        self.edf_operator = EDFOperator(
+            edf_file_name,
+            grammar=grammar if grammar is not None else self.grammar)
         # now create all messages
         self.edf_operator.read_all_messages()
 

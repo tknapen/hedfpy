@@ -17,6 +17,7 @@ import numpy as np
 
 from .CommandLineOperator import EDF2ASCOperator
 from .Operator import Operator
+from .message_grammar import MessageGrammar
 
 
 class EDFOperator(Operator):
@@ -26,8 +27,12 @@ class EDFOperator(Operator):
     executes the conversion.
     """
 
-    def __init__(self, input_object, **kwargs):
+    def __init__(self, input_object, grammar=None, **kwargs):
         super(EDFOperator, self).__init__(input_object=input_object, **kwargs)
+        # the set of regexes used to parse the message file; see
+        # message_grammar.MessageGrammar. Defaults to hedfpy's historical
+        # patterns, so omitting it reproduces the previous behaviour.
+        self.grammar = grammar if grammar is not None else MessageGrammar.default()
         if self.input_object.__class__.__name__ == 'str':
             self.input_file_name = self.input_object
             self.logger.info(
@@ -125,11 +130,11 @@ class EDFOperator(Operator):
         block_edge_times = [gaze_times[i] for i in block_edge_indices]
 
         self.get_message_string()
-        sample_re = 'MSG\t[\d\.]+\t!MODE RECORD CR (\d+) \d+ \d+ (\S+)'
+        sample_re = self.grammar.block_sample
         block_sample_occurrences = re.findall(
             re.compile(sample_re), self.message_string)
 
-        screen_re = 'MSG\t[\d\.]+\tGAZE_COORDS (\d+.\d+) (\d+.\d+) (\d+.\d+) (\d+.\d+)'
+        screen_re = self.grammar.block_screen
         block_screen_occurrences = re.findall(
             re.compile(screen_re), self.message_string)
 
@@ -207,13 +212,10 @@ class EDFOperator(Operator):
         self.read_sound_events()
 
     def read_trials(self,
-                    # start_re='MSG\t([\d\.]+)\ttrial (\d+) started at (\d+.\d)',
-                    pulse_re='MSG\t([\d\.]+)\tstart_type-pulse_trial-(\d+)_phase-0_key-t_time-(\d.+)',
-                    stim_re='MSG\t([\d\.]+)\tstart_type-stim_trial-(\d+)_phase-0',
-                    # stop_re='MSG\t([\d\.]+)\ttrial (\d+) stopped at (\d+.\d)',
-                    # phase_re='MSG\t([\d\.]+)\ttrial X phase (\d+) started at (\d+.\d)',
-                    phase_re = 'MSG\t([\d\.]+)\tstart_type-stim_trial-XXX_phase-(\d+)',
-                    parameter_re='MSG\t[\d\.]+\ttrial X parameter[\t ]*(\S*?)\s+: ([-\d\.]*|[\w]*)'):
+                    pulse_re=None,
+                    stim_re=None,
+                    phase_re=None,
+                    parameter_re=None):
         """
         read_trials reads in trials from the message file,
         constructing timings and parameters for each of the trials,
@@ -221,7 +223,15 @@ class EDFOperator(Operator):
         It reads the actual values to internal variables, and also
         creates dictionaries that will indicate the formats needed
         when creating the hfd5 file
+
+        Each regex argument defaults to the corresponding pattern in
+        self.grammar (see message_grammar.MessageGrammar); pass an
+        explicit string to override a single pattern ad hoc.
         """
+        pulse_re = pulse_re if pulse_re is not None else self.grammar.trial_start_pulse
+        stim_re = stim_re if stim_re is not None else self.grammar.trial_start_stim
+        phase_re = phase_re if phase_re is not None else self.grammar.trial_phase
+        parameter_re = parameter_re if parameter_re is not None else self.grammar.parameter
 
         self.logger.info('reading trials from %s', os.path.split(self.message_file)[-1])
         self.get_message_string()
@@ -376,9 +386,9 @@ class EDFOperator(Operator):
         else:  # we have to take the parameters from the output_dict pickle file of the same name as the edf file.
             self.logger.info('no parameter information in edf file')
 
-    def read_key_events_unix(self,
-                             key_re='MSG\t([\d\.]+)\ttrial X event \<Event\((\d)-Key(\S*?) {\'scancode\': (\d+), \'key\': ([-+]?\d+)(, \'unicode\': u\'\S*?\',|,) \'mod\': (\d+)}\)\> at (\d+.\d)'):
+    def read_key_events_unix(self, key_re=None):
         """read_key_events reads experimental events from the message file"""
+        key_re = key_re if key_re is not None else self.grammar.key_unix
         self.logger.info('reading key_events from %s',
                          os.path.split(self.message_file)[-1])
         self.get_message_string()
@@ -412,9 +422,9 @@ class EDFOperator(Operator):
                 self.event_type_dictionary = np.dtype(
                     [('EL_timestamp', np.float64), ('event_type', np.float64), ('exp_timestamp', np.float64)])
 
-    def read_key_events_unix2(self,
-                              key_re='MSG\t([\d\.]+)\ttrial X event . at (\d+.\d)'):
+    def read_key_events_unix2(self, key_re=None):
         """read_key_events reads experimental events from the message file"""
+        key_re = key_re if key_re is not None else self.grammar.key_unix2
         self.logger.info('reading key_events from %s',
                          os.path.split(self.message_file)[-1])
         self.get_message_string()
@@ -456,9 +466,9 @@ class EDFOperator(Operator):
                 self.event_type_dictionary = np.dtype(
                     [('EL_timestamp', np.float64), ('exp_timestamp', np.float64)])
 
-    def read_key_events_win(self,
-                            key_re='MSG\t([\d\.]+)\ttrial X event \<Event\((\d)-Key(.*?) {\'key\': (\d+)(, \'unicode\': u\'l\',|,) \'mod\': (\d+)}\)\> at (\d+.\d)'):
+    def read_key_events_win(self, key_re=None):
         """read_key_events reads experimental events from the message file"""
+        key_re = key_re if key_re is not None else self.grammar.key_win
 
         self.logger.info('reading key_events from %s',
                          os.path.split(self.message_file)[-1])
@@ -494,10 +504,7 @@ class EDFOperator(Operator):
                 self.event_type_dictionary = np.dtype(
                     [('EL_timestamp', np.float64), ('event_type', np.float64), ('exp_timestamp', np.float64)])
 
-    def read_eyelink_events(self,
-                            sacc_re='ESACC\t(\S+)[\s\t]+(-?\d*\.?\d*)\t(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+.?\d+)',
-                            fix_re='EFIX\t(\S+)\s+(-?\d*\.?\d*)\t(-?\d+\.?\d*)\s+(-?\d+\.?\d*)?\s+(-?\d+\.?\d*)?\s+(-?\d+\.?\d*)?\s+(-?\d+\.?\d*)?',
-                            blink_re='EBLINK\t(\S+)\s+(-?\d*\.?\d*)\t(-?\d+\.?\d*)\s+(-?\d?.?\d*)?'):
+    def read_eyelink_events(self, sacc_re=None, fix_re=None, blink_re=None):
         """
         read_key_events reads experimental events from the message file.
 
@@ -508,7 +515,13 @@ class EDFOperator(Operator):
         ESACC    R    2347313    2347487    174      621.8      472.4      662.0      479.0       0.99
         EFIX    R    2340362.0    2347312.0    6950      650.0      480.4       5377
         EBLINK    R    2347352    2347423    71
+
+        Each regex argument defaults to the corresponding pattern in
+        self.grammar (see message_grammar.MessageGrammar).
         """
+        sacc_re = sacc_re if sacc_re is not None else self.grammar.saccade
+        fix_re = fix_re if fix_re is not None else self.grammar.fixation
+        blink_re = blink_re if blink_re is not None else self.grammar.blink
         self.logger.info('reading eyelink events from %s',
                          os.path.split(self.message_file)[-1])
         self.get_message_string()
@@ -535,14 +548,16 @@ class EDFOperator(Operator):
             else:
                 del self.blinks_from_message_file
 
-    def read_sound_events(self,
-                          sound_re='MSG\t([\d\.]+)\treward (\d+) at (\d+.\d)'):
+    def read_sound_events(self, sound_re=None):
         """
         read_sound_events reads sounds from the message file.
 
         Example:
         MSG    1885375.0    sound 0 at 29.3498238511
+
+        sound_re defaults to self.grammar.sound (see MessageGrammar).
         """
+        sound_re = sound_re if sound_re is not None else self.grammar.sound
         self.logger.info('reading sounds from %s',
                          os.path.split(self.message_file)[-1])
         self.get_message_string()

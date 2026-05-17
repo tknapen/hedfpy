@@ -1,0 +1,63 @@
+# hedfpy message grammar -- copy this file, edit, and load it with:
+#
+#     from hedfpy import HDFEyeOperator, MessageGrammar
+#     grammar = MessageGrammar.from_toml("my_grammar.toml")
+#     ho = HDFEyeOperator("session.h5", grammar=grammar)
+#     ho.add_edf_file("run.edf")        # uses the grammar above
+#
+# Every key is optional: omit a key to keep hedfpy's built-in default for
+# it. The values shown here ARE the built-in defaults, so this file is
+# also a faithful reference of what hedfpy parses out of the box.
+#
+# Values are regular expressions matched against the .msg text. Use TOML
+# single-quoted (literal) strings so backslashes are not interpreted.
+# Two placeholders are substituted with the trial number before matching:
+#   XXX  ->  trial number   (trial_phase)
+#    X   ->  trial number   (parameter, key_unix, key_win, key_unix2)
+#
+# Capture groups are positional; keep their order and meaning when you
+# override a pattern. See message_grammar.py for each group layout.
+
+[grammar]
+
+# --- experiment-generated messages (most likely to need changing) --------
+
+# trial start, pulse-triggered: (EL_timestamp, trial_nr, exp_time)
+trial_start_pulse = 'MSG\t([\d\.]+)\tstart_type-pulse_trial-(\d+)_phase-0_key-t_time-(\d.+)'
+
+# trial start, stimulus-triggered: (EL_timestamp, trial_nr)
+trial_start_stim = 'MSG\t([\d\.]+)\tstart_type-stim_trial-(\d+)_phase-0'
+
+# trial phase ('XXX' -> trial nr): (EL_timestamp, phase_index)
+trial_phase = 'MSG\t([\d\.]+)\tstart_type-stim_trial-XXX_phase-(\d+)'
+
+# per-trial parameter (' X ' -> ' trial_nr '): (name, value)
+parameter = 'MSG\t[\d\.]+\ttrial X parameter[\t ]*(\S*?)\s+: ([-\d\.]*|[\w]*)'
+
+# key events (' X ' -> ' trial_nr '); the three variants are tried in
+# order until one matches. key_unix / key_win contain single quotes, so
+# they use TOML multi-line literal ('''...''') strings:
+key_unix = '''MSG\t([\d\.]+)\ttrial X event \<Event\((\d)-Key(\S*?) {'scancode': (\d+), 'key': ([-+]?\d+)(, 'unicode': u'\S*?',|,) 'mod': (\d+)}\)\> at (\d+.\d)'''
+key_win = '''MSG\t([\d\.]+)\ttrial X event \<Event\((\d)-Key(.*?) {'key': (\d+)(, 'unicode': u'l',|,) 'mod': (\d+)}\)\> at (\d+.\d)'''
+key_unix2 = 'MSG\t([\d\.]+)\ttrial X event . at (\d+.\d)'
+
+# sound / reward event: (EL_timestamp, sound_type, exp_timestamp)
+sound = 'MSG\t([\d\.]+)\treward (\d+) at (\d+.\d)'
+
+# --- eyelink-generated messages (format fixed by SR Research) ------------
+
+# block sampling mode: (sample_rate, eye_recorded)
+block_sample = 'MSG\t[\d\.]+\t!MODE RECORD CR (\d+) \d+ \d+ (\S+)'
+
+# screen geometry: (x0, y0, x1, y1)
+block_screen = 'MSG\t[\d\.]+\tGAZE_COORDS (\d+.\d+) (\d+.\d+) (\d+.\d+) (\d+.\d+)'
+
+# saccade: (eye, start, end, duration, start_x, start_y, end_x, end_y,
+#           length, peak_velocity)
+saccade = 'ESACC\t(\S+)[\s\t]+(-?\d*\.?\d*)\t(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+.?\d+)'
+
+# fixation: (eye, start, end, duration, x, y, pupil_size)
+fixation = 'EFIX\t(\S+)\s+(-?\d*\.?\d*)\t(-?\d+\.?\d*)\s+(-?\d+\.?\d*)?\s+(-?\d+\.?\d*)?\s+(-?\d+\.?\d*)?\s+(-?\d+\.?\d*)?'
+
+# blink: (eye, start, end, duration)
+blink = 'EBLINK\t(\S+)\s+(-?\d*\.?\d*)\t(-?\d+\.?\d*)\s+(-?\d?.?\d*)?'

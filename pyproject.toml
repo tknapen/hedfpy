@@ -31,10 +31,10 @@ dependencies = [
     "lmfit",
     "statsmodels",
     "scikit-learn",
-    "ipython",
     "mne",
     "tables",
     "h5py",
+    'tomli; python_version < "3.11"',
 ]
 
 
@@ -43,7 +43,7 @@ dev = ["pytest", "black", "flake8"]
 
 [tool.setuptools]
 packages = ["hedfpy"]
-package-data = { hedfpy = ['test/*.ipynb', 'test/*.edf'] }
+package-data = { hedfpy = ['grammar.toml'] }
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
