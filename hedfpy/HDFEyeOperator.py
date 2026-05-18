@@ -378,19 +378,19 @@ class HDFEyeOperator(Operator):
         return eye
 
     def eye_during_trial(self, trial_nr, alias):
-        """docstring for signal_from_trial"""
-        with pd.HDFStore(self.input_object) as h5_file:
-            table = h5_file['%s/trials' % alias]
-            time_period = np.array(table[table['trial_start_index'] == trial_nr][[
-                                   'trial_start_EL_timestamp', 'trial_end_EL_timestamp']])
-        return self.eye_during_period(time_period[0], alias)
+        """eye_during_trial returns the eye recorded during a given trial"""
+        time_period = self.get_time_period_for_trial(trial_nr, alias)
+        return self.eye_during_period(time_period, alias)
 
     def screen_dimensions_during_period(self, time_period, alias):
-        """docstring for eye_during_period"""
+        """screen_dimensions_during_period returns the (x, y) screen size
+        in pixels of the block a given time period falls in"""
         with pd.HDFStore(self.input_object) as h5_file:
-            period_block_nr = self.sample_in_block(
-                sample=time_period[0], block_table=h5_file['%s/blocks' % alias])
-            return h5_file['%s/blocks' % alias]['sample_rate'][period_block_nr]
+            blocks = h5_file['%s/blocks' % alias]
+        period_block_nr = self.sample_in_block(
+            sample=time_period[0], block_table=blocks)
+        return (float(blocks['screen_x_pix'].iloc[period_block_nr]),
+                float(blocks['screen_y_pix'].iloc[period_block_nr]))
 
     # def sample_rate_during_period(self, time_period, alias):
     #
@@ -403,11 +403,8 @@ class HDFEyeOperator(Operator):
         return self.block_properties(alias).sample_rate[0]
 
     def sample_rate_during_trial(self, trial_nr, alias):
-        """docstring for signal_from_trial"""
-        with pd.HDFStore(self.input_object) as h5_file:
-            table = h5_file['%s/trials' % alias]
-            time_period = np.array(table[table['trial_start_index'] == trial_nr][['trial_start_EL_timestamp', 'trial_end_EL_timestamp']])
-        return float(self.sample_rate_during_period(time_period[0], alias))
+        """sample_rate_during_trial returns the sampling rate for a trial"""
+        return float(self.sample_rate_during_period(alias))
 
     def trial_properties(self, alias, trial=None):
         if trial is None:
@@ -511,14 +508,33 @@ class HDFEyeOperator(Operator):
         return self.blinks_during_period(time_period, alias)
 
     def get_time_period_for_trial(self, trial_nr, alias, time_extensions=[0, 0]):
-        """ Get the timestamps for the start and end of a given trial and alias """
+        """Return the (start, end) EL timestamps of a trial.
 
-        with pd.HDFStore(self.input_object) as h5_file:
-            table = h5_file['%s/trials' % alias]
+        The experiment does not send a trial-stop message, so a trial is
+        taken to end where the next trial starts; the last trial of a
+        block ends at that block's end timestamp. time_extensions, if
+        given, is added to the (start, end) pair respectively.
+        """
+        trials = self.trial_properties(alias).sort_values('trial_start_index')
+        starts = np.asarray(trials['trial_start_EL_timestamp'], dtype=float)
+        indices = np.asarray(trials['trial_start_index'])
 
-        table = table.set_index('trial_start_index')
+        position = np.where(indices == trial_nr)[0]
+        if position.shape[0] == 0:
+            raise ValueError(
+                'trial %s not found for alias %s' % (trial_nr, alias))
+        position = position[0]
 
-        return table.ix[trial_nr].trial_start_EL_timestamp, table.ix[trial_nr].trial_end_EL_timestamp
+        start_time = starts[position]
+        if position + 1 < starts.shape[0]:
+            end_time = starts[position + 1]
+        else:
+            # last trial: ends at the end of the block containing its start
+            blocks = self.block_properties(alias)
+            block_nr = self.sample_in_block(start_time, blocks)
+            end_time = float(np.asarray(blocks['block_end_timestamp'])[block_nr])
+
+        return start_time + time_extensions[0], end_time + time_extensions[1]
 
     def signal_from_trial(self, trial_nr, alias, signal, requested_eye=None, time_extensions=[0, 0]):
         """ Get the eye-related signal from a specific trial """
@@ -559,28 +575,34 @@ class HDFEyeOperator(Operator):
         return table[(table.EL_timestamp > time_period[0]) & (table.EL_timestamp < time_period[1])]
 
     def time_period_for_trial_phases(self, trial_nr, trial_phases, alias):
-        """the time period corresponding to the trial phases requested.
+        """Return the [start, end] time period spanned by trial phases.
+
+        A first phase of 0 means the trial start; a last phase of -1
+        means the (implicit) trial end -- see get_time_period_for_trial.
         """
+        # resolved before opening the store below: it opens its own
+        trial_start, trial_end = self.get_time_period_for_trial(trial_nr, alias)
+
         with pd.HDFStore(self.input_object) as h5_file:
             phase_table = h5_file['%s/trial_phases' % alias]
-            trial_table = h5_file['%s/trials' % alias]
-            # check whether one of the trial phases is the end or the beginning of the trial.
-            # if so, then supplant the time of that phase with its trial's end or start time.
-            if trial_phases[0] == 0:
-                start_time = trial_table[trial_table['trial_start_index']
-                                         == trial_nr]['trial_start_EL_timestamp']
-            else:
-                start_time = phase_table[((phase_table['trial_phase_index'] == trial_phases[0]) * (
-                    phase_table['trial_phase_trial'] == trial_nr))]['trial_phase_EL_timestamp']
-            if trial_phases[-1] == -1:
-                end_time = trial_table[trial_table['trial_start_index']
-                                       == trial_nr]['trial_end_EL_timestamp']
-            else:
-                end_time = phase_table[((phase_table['trial_phase_index'] == trial_phases[1]) * (
-                    phase_table['trial_phase_trial'] == trial_nr))]['trial_phase_EL_timestamp']
-            time_period = np.array(
-                [np.array(start_time), np.array(end_time)]).squeeze()
-        return time_period
+
+        def phase_time(phase_index):
+            match = phase_table[
+                (phase_table['trial_phase_index'] == phase_index)
+                & (phase_table['trial_phase_trial'] == trial_nr)]
+            return float(match['trial_phase_EL_timestamp'].iloc[0])
+
+        # check whether one of the trial phases is the start or the end of
+        # the trial; if so, use the trial's start/end time for it.
+        if trial_phases[0] == 0:
+            start_time = trial_start
+        else:
+            start_time = phase_time(trial_phases[0])
+        if trial_phases[-1] == -1:
+            end_time = trial_end
+        else:
+            end_time = phase_time(trial_phases[1])
+        return np.array([start_time, end_time])
 
     def signal_from_trial_phases(self, trial_nr, trial_phases, alias, signal, requested_eye='L', time_extensions=[0, 0]):
         """docstring for signal_from_trial"""
@@ -595,7 +617,7 @@ class HDFEyeOperator(Operator):
             trial_nr=trial_nr, trial_phases=trial_phases, alias=alias)
         time_period = np.array(
             [time_period[0] + time_extensions[0], time_period[1] + time_extensions[1]]).squeeze()
-        return self.detect_saccades_during_period(time_period=time_period, alias=alias, requested_eye=requested_eye, time_extensions=time_extensions, l=l)
+        return self.detect_saccades_during_period(time_period=time_period, alias=alias, requested_eye=requested_eye, l=l)
 
     def read_session_data(self, alias, name):
         """
@@ -611,28 +633,37 @@ class HDFEyeOperator(Operator):
 
     def trial_for_time_period(self, alias, time_period):
         """
-        Returns a trial index for a given time period.
-        Raises a warning (no Exception) when the time period spans
-        multiple trials, and only returns index of the first of those
-        trials.
+        Returns the index of the trial a given time period starts in.
+
+        Raises when no trial contains the start of the period. Warns (no
+        Exception) when the period extends past that trial's end, and
+        then returns the index of that first trial. Trial ends are
+        implicit -- a trial ends where the next one starts.
         """
+        trials = self.trial_properties(alias).sort_values(
+            'trial_start_EL_timestamp')
+        starts = np.asarray(trials['trial_start_EL_timestamp'], dtype=float)
+        indices = np.asarray(trials['trial_start_index'])
 
-        trial_properties = self.trial_properties(alias)
-        trial = trial_properties[(trial_properties.trial_start_EL_timestamp < time_period[0])
-                                 * (trial_properties.trial_end_EL_timestamp > time_period[0])]
+        # a trial ends where the next one starts; the last trial of a
+        # block ends at that block's end timestamp.
+        ends = np.empty_like(starts)
+        ends[:-1] = starts[1:]
+        blocks = self.block_properties(alias)
+        last_block = self.sample_in_block(starts[-1], blocks)
+        ends[-1] = float(np.asarray(blocks['block_end_timestamp'])[last_block])
 
-        if len(trial) == 0:
+        t0 = float(time_period[0])
+        within = np.where((starts <= t0) & (t0 < ends))[0]
+        if within.shape[0] == 0:
             raise Exception('No trial found for this time_period')
 
-        assert(len(trial == 1)), "Found more than one trial in which this time period starts. Something is wrong with the data"
-
-        trial = trial.iloc[0]
-
-        if time_period[1] > trial.trial_end_EL_timestamp:
+        position = within[0]
+        if float(time_period[1]) > ends[position]:
             warnings.warn(
                 ' *** This time period spans multiple trials. Only index of first trial is returned. *** ')
 
-        return int(trial.trial_start_index)
+        return int(indices[position])
 
     def block_for_time_period(self, alias, time_period):
         block_properties = self.block_properties(alias)
