@@ -10,14 +10,22 @@ These are:
 ## MSG format
 for full parsing of the edf file data, hedfpy assumes a specific trial-based experimental format that is communicated to the eye tracker. Specifically, it looks for explicitly formatted messages by means of regular expressions. These messages detail the start and end of trial phases, trials, button press events, sound events and the stimulus parameters for a given trial which are all stored in tabular format in the HDF5 file. The parsing of these messages can be turned off for basic functionality.
 
-## Dependencies
-numpy, scipy, matplotlib, statsmodels, sklearn, tables, lmfit
+The regular expressions used to parse these messages are collected in a `MessageGrammar` (see `hedfpy/message_grammar.py`); the defaults match the message format produced by [exptools2](https://github.com/VU-Cog-Sci/exptools2). To parse a different format, copy and edit the documented `hedfpy/grammar.toml` template and pass your own grammar:
 
-Further install requirements: hdf5 libraries, edf2asc command-line utility from [SR Research](http://www.sr-research.com "SR Research")
+    from hedfpy import HDFEyeOperator, MessageGrammar
+
+    grammar = MessageGrammar.from_toml('my_grammar.toml')
+    ho = HDFEyeOperator('session.h5', grammar=grammar)
+    ho.add_edf_file('run.edf')
+
+## Dependencies
+hedfpy is installed with `pip install .`, which pulls in its Python dependencies (numpy, scipy, pandas, matplotlib, statsmodels, scikit-learn, lmfit, mne, PyTables, h5py).
+
+It additionally needs the HDF5 libraries and the `edf2asc` command-line utility from [SR Research](http://www.sr-research.com "SR Research") available on the `$PATH`.
 
 TODO
-1. For now, the `edf_message_data_to_hdf` method of `HDFEyeOperator` and `EDFOperator` searches for both eyelink-generated and experiment-generated `MSG` strings in the edf file's output. The eyelink generated messages are standard, but the experiment-generated ones are not. At the moment, the methods that tease these messages apart dissect the EDF's output into trial timings, trial phase timings, trial parameters, button press and sound occurrences based on regular expressions that are hard-coded in the `EDFOperator`. This needs to be parceled out of the code so that this becomes more generally user-friendly. 
-2. hedfpy now processes an edf file according to a fixed set of preprocessing steps (see the code in `HDFEyeOperator`'s `edf_gaze_data_to_hdf`). These need to be made elective at some point. 
+1. ~~The regular expressions that parse experiment-generated `MSG` strings are hard-coded in `EDFOperator`.~~ Done: they now live in a configurable `MessageGrammar` (see above).
+2. hedfpy processes an edf file according to a fixed set of preprocessing steps (see the code in `HDFEyeOperator`'s `edf_gaze_data_to_hdf`). These need to be made elective at some point.
 
 
 

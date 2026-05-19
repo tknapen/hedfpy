@@ -174,30 +174,18 @@ class EDFOperator(Operator):
 
     def read_all_messages(self):
         """
-        read_all_messages reads the messages sent to the eyelink by the experiment computer.
+        read_all_messages reads every kind of message hedfpy understands
+        from the message file: trials, trial phases, parameters, key
+        events, the eyelink's own saccade / fixation / blink events, and
+        sounds.
 
-        it does this with all of the different types of information that can be listed in a message file.
-        read_all_messages works independently of the identify_blocks method.
-
-        read_all_messages counts on messages in particular formats having been sent to the eyelink during the experiment.
-        The defaults are as follows (where X=trial number):
-        Start of a trial: 'MSG\t([\d\.]+)\ttrial (\d+) started at (\d+.\d)'
-        End of a trial: 'MSG\t([\d\.]+)\ttrial (\d+) stopped at (\d+.\d)'
-        Start of a phase within a trial: 'MSG\t([\d\.]+)\ttrial X phase (\d+) started at (\d+.\d)'
-        Parameters that may vary per trial: 'MSG\t[\d\.]+\ttrial X parameter[\t ]*(\S*?)\s+: ([-\d\.]*|[\w]*)'
-        Keys that may have been pressed within a trial:
-        'MSG\t([\d\.]+)\ttrial X event \<Event\((\d)-Key(\S*?) {\'scancode\': (\d+), \'key\': (\d+)(, \'unicode\': u\'\S*?\',|,) \'mod\': (\d+)}\)\> at (\d+.\d)'
-        Sound events: 'MSG\t([\d\.]+)\treward (\d+) at (\d+.\d)'
-
-        These messages can be customized, but the code does expect these to be regular
-        expressions that return the numbers and strings that these REs do (i.e. parts between []).
-
-        read_all_messages also counts on further info that is automatically included in the edf event data,
-        so there is no need to send it to Eyelink yourself:
-        Saccade info:
-        'ESACC\t(\S+)[\s\t]+(-?\d*\.?\d*)\t(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+.?\d+)',
-        Fixation info: 'EFIX\t(\S+)\s+(-?\d*\.?\d*)\t(-?\d+\.?\d*)\s+(-?\d+\.?\d*)?\s+(-?\d+\.?\d*)?\s+(-?\d+\.?\d*)?\s+(-?\d+\.?\d*)?',
-        Blink info: 'EBLINK\t(\S+)\s+(-?\d*\.?\d*)\t(-?\d+\.?\d*)\s+(-?\d?.?\d*)?'
+        The experiment-generated messages must have been sent to the
+        eyelink during the experiment in a format the grammar matches;
+        the saccade / fixation / blink events are written by the eyelink
+        itself. All regular expressions are taken from self.grammar (see
+        message_grammar.MessageGrammar), so a different message format is
+        handled by passing a different grammar -- no need to edit this
+        code. read_all_messages works independently of identify_blocks.
         """
 
         # loads the entire message file into an internal variable self.message_string
@@ -506,15 +494,13 @@ class EDFOperator(Operator):
 
     def read_eyelink_events(self, sacc_re=None, fix_re=None, blink_re=None):
         """
-        read_key_events reads experimental events from the message file.
+        read_eyelink_events reads the saccade, fixation and blink events
+        that the eyelink itself writes into the message file.
 
-        other sacc_re = 'ESACC\t(\S+)[\s\t]+(-?\d*\.?\d*)\t(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+\.?\d*)\s+(-?\d+.?\d+)',
-
-
-        Examples:
-        ESACC    R    2347313    2347487    174      621.8      472.4      662.0      479.0       0.99
-        EFIX    R    2340362.0    2347312.0    6950      650.0      480.4       5377
-        EBLINK    R    2347352    2347423    71
+        Example lines:
+        ESACC    R    2347313    2347487    174    621.8    472.4    662.0    479.0    0.99
+        EFIX     R    2340362.0  2347312.0  6950   650.0    480.4    5377
+        EBLINK   R    2347352    2347423    71
 
         Each regex argument defaults to the corresponding pattern in
         self.grammar (see message_grammar.MessageGrammar).

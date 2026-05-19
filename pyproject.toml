@@ -1,56 +1,69 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel", "numpy"]
+requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "hedfpy"
-version = "0.0.dev3" # Replace this with the value dynamically loaded by `get_version`
+dynamic = ["version"]
 description = "convert SR Research eyelink edf output to tabular hdf5 format"
 readme = "README.md"
 license = { text = "GPL-3.0-or-later" }
 authors = [{ name = "Tomas Knapen", email = "tknapen@gmail.com" }]
 maintainers = [{ name = "Tomas Knapen", email = "tknapen@gmail.com" }]
-keywords = ["seaborn", "visualization", "neuroimaging", "plotting"]
+keywords = ["eyetracking", "eyelink", "pupillometry", "edf", "hdf5", "psychophysics"]
 classifiers = [
     'Intended Audience :: Science/Research',
-    'Intended Audience :: Developers',
-    'License :: OSI Approved',
-    'Programming Language :: Python',
-    'Topic :: Software Development',
+    'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)',
+    'Programming Language :: Python :: 3',
+    'Programming Language :: Python :: 3.9',
+    'Programming Language :: Python :: 3.10',
+    'Programming Language :: Python :: 3.11',
+    'Programming Language :: Python :: 3.12',
     'Topic :: Scientific/Engineering',
     'Operating System :: POSIX',
     'Operating System :: Unix',
     'Operating System :: MacOS',
 ]
 
-# requires-python = ">=3.7, <3.11"
+requires-python = ">=3.9"
 dependencies = [
-    "matplotlib",
-    "pandas",
     "numpy",
-    "lmfit",
+    "scipy",
+    "pandas",
+    "matplotlib",
     "statsmodels",
     "scikit-learn",
+    "lmfit",
     "mne",
     "tables",
     "h5py",
     'tomli; python_version < "3.11"',
 ]
 
-
 [project.optional-dependencies]
-dev = ["pytest", "black", "flake8"]
+dev = ["pytest", "ruff"]
+
+[project.urls]
+Homepage = "https://github.com/tknapen/hedfpy"
+Repository = "https://github.com/tknapen/hedfpy"
 
 [tool.setuptools]
 packages = ["hedfpy"]
 package-data = { hedfpy = ['grammar.toml'] }
 
+[tool.setuptools.dynamic]
+version = { attr = "hedfpy.__version__" }
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-# hedfpy currently triggers many third-party deprecation warnings; these
-# are tightened up as part of the modernization phase of the refactor.
+# hedfpy still triggers some third-party deprecation warnings; these are
+# tightened up as the modernization of the refactor continues.
 filterwarnings = [
     "ignore::DeprecationWarning",
     "ignore::FutureWarning",
     "ignore::PendingDeprecationWarning",
 ]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
