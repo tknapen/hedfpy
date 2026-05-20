@@ -107,3 +107,23 @@ def test_subset_pipeline_skips_regress_and_tf(tmp_path):
     assert "L_pupil_bp_clean_psc" not in cols
     # time_frequency columns -- skipped
     assert not any(c.startswith("L_pupil_filterbank") for c in cols)
+
+
+def test_time_frequency_decomposition_rejects_morlet():
+    """The historical morlet TF path has been removed; requesting it now
+    raises a clear error rather than blowing up on the missing MNE API."""
+    import numpy as np
+    from hedfpy import EyeSignalOperator
+
+    eso = EyeSignalOperator(
+        input_object={
+            "timepoints": np.arange(1000, dtype=float),
+            "gaze_X": np.zeros(1000),
+            "gaze_Y": np.zeros(1000),
+            "pupil": np.ones(1000),
+        },
+        sample_rate=1000.0,
+    )
+    eso.interpolated_pupil = np.ones(1000)
+    with pytest.raises(ValueError, match="lp_butterworth"):
+        eso.time_frequency_decomposition_pupil(tf_decomposition="morlet")

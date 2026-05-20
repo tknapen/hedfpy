@@ -22,34 +22,45 @@ from .message_grammar import MessageGrammar
 
 class EDFOperator(Operator):
     """
-    upon initialization, EDFOperator creates an EDF2ASCOperator that sets up
-    the edf to asc conversion of self.inputFileObject, and immediately
-    executes the conversion.
+    EDFOperator parses an SR Research .edf file into hedfpy's internal
+    representation. It produces (or reuses) a sibling .msg / .gaz pair via
+    ``edf2asc``; pass ``auto_convert=False`` to skip that conversion when
+    those sidecar files have been produced elsewhere.
     """
 
-    def __init__(self, input_object, grammar=None, **kwargs):
+    def __init__(self, input_object, grammar=None, auto_convert=True, **kwargs):
         super(EDFOperator, self).__init__(input_object=input_object, **kwargs)
         # the set of regexes used to parse the message file; see
         # message_grammar.MessageGrammar. Defaults to hedfpy's historical
         # patterns, so omitting it reproduces the previous behaviour.
         self.grammar = grammar if grammar is not None else MessageGrammar.default()
-        if self.input_object.__class__.__name__ == 'str':
-            self.input_file_name = self.input_object
-            self.logger.info(
-                'started with '+os.path.split(self.input_file_name)[-1])
 
-        # ** DATE: Tue Feb  4 10:19:06 2014
-        if os.path.splitext(self.input_object)[-1] == '.edf':
-            self.input_file_name = self.input_object
-            # in Kwargs there's a variable that we can set to
-            eac = EDF2ASCOperator(self.input_file_name)
-            eac.configure()
-            self.message_file = eac.messageOutputFileName
-            self.gaze_file = eac.gazeOutputFileName
-            if not os.path.isfile(eac.messageOutputFileName):
-                eac.execute()
-        else:
-            self.logger.error('input file has to be of edf type.')
+        if not isinstance(input_object, (str, os.PathLike)):
+            raise TypeError(
+                "EDFOperator expects a path to a .edf file, got %s"
+                % type(input_object).__name__)
+        self.input_file_name = os.fspath(input_object)
+        if os.path.splitext(self.input_file_name)[-1] != '.edf':
+            raise ValueError(
+                "EDFOperator expects a .edf file, got %s"
+                % self.input_file_name)
+        self.logger.info(
+            'started with ' + os.path.split(self.input_file_name)[-1])
+
+        # Set the .msg / .gaz output paths up front; the actual edf2asc
+        # invocation is in convert() and is only triggered automatically
+        # when the .msg sidecar is not already present.
+        self._edf2asc = EDF2ASCOperator(self.input_file_name)
+        self._edf2asc.configure()
+        self.message_file = self._edf2asc.messageOutputFileName
+        self.gaze_file = self._edf2asc.gazeOutputFileName
+
+        if auto_convert and not os.path.isfile(self.message_file):
+            self.convert()
+
+    def convert(self):
+        """Run edf2asc to produce the .msg and .gaz sidecar files."""
+        self._edf2asc.execute()
 
     def clean_gaze_information(self):
         """

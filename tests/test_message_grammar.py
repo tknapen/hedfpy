@@ -137,3 +137,28 @@ def test_explicit_regex_argument_still_overrides(tmp_path):
     op = _edf_operator(tmp_path, ALT_FORMAT_MSG)
     op.read_trials(stim_re=r"MSG\t([\d\.]+)\tBEGIN_TRIAL (\d+)")
     assert op.nr_trials == 2
+
+
+# --- EDFOperator construction validation ---------------------------------
+
+def test_edf_operator_rejects_non_pathlike():
+    with pytest.raises(TypeError, match="expects a path"):
+        hedfpy.EDFOperator(12345)
+
+
+def test_edf_operator_rejects_non_edf_extension(tmp_path):
+    txt = tmp_path / "not_an_edf.txt"
+    txt.write_text("")
+    with pytest.raises(ValueError, match=r"expects a \.edf file"):
+        hedfpy.EDFOperator(str(txt))
+
+
+def test_edf_operator_auto_convert_false_skips_edf2asc(tmp_path):
+    """With auto_convert=False, construction succeeds without invoking
+    edf2asc even when no .msg sidecar exists."""
+    edf = tmp_path / "synthetic.edf"
+    edf.write_bytes(b"")
+    op = hedfpy.EDFOperator(str(edf), auto_convert=False)
+    assert op.input_file_name == str(edf)
+    assert op.message_file == str(tmp_path / "synthetic.msg")
+    assert op.gaze_file == str(tmp_path / "synthetic.gaz")

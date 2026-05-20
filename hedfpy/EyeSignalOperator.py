@@ -380,29 +380,35 @@ class EyeSignalOperator(Operator):
     Its further methods create internal variables storing more derived
     signals that result from further processing.
     """
-    def __init__(self, input_object, **kwargs):
-        """input_object is a dictionary with timepoints, gaze_X, and gaze_Y and pupil keys and timeseries as values"""
-        super().__init__(input_object = input_object, **kwargs)
+    def __init__(self, input_object, sample_rate=1000.0,
+                 eyelink_blink_data=None, eyelink_sac_data=None, **kwargs):
+        """input_object is a dictionary with ``timepoints``, ``gaze_X``,
+        ``gaze_Y`` and ``pupil`` keys; sample_rate is in Hz.
+        ``eyelink_blink_data`` and ``eyelink_sac_data``, if given, are the
+        eyelink-detected blink and saccade tables (with ``start_timestamp``
+        and ``end_timestamp`` columns)."""
+        super().__init__(input_object=input_object, **kwargs)
         self.timepoints = np.array(self.input_object['timepoints']).squeeze()
         self.raw_gaze_X = np.array(self.input_object['gaze_X']).squeeze()
         self.raw_gaze_Y = np.array(self.input_object['gaze_Y']).squeeze()
         self.raw_pupil = np.array(self.input_object['pupil']).squeeze()
+        self.sample_rate = sample_rate
 
-        if not hasattr(self, 'sample_rate'): # this should have been set as a kwarg, but if it hasn't we just assume a standard 1000 Hz
-            self.sample_rate = 1000.0
-
-        if hasattr(self, 'eyelink_blink_data'):
-            # internalize all blinks smaller than 4 seconds, since these are missing signals to be treated differently
-            self.blink_starts_EL = (np.array(self.eyelink_blink_data['start_timestamp']) - self.timepoints[0]) / (1000.0 / self.sample_rate) # defined in samples
-            self.blink_ends_EL = (np.array(self.eyelink_blink_data['end_timestamp']) - self.timepoints[0]) / (1000.0 / self.sample_rate) # defined in samples
+        if eyelink_blink_data is not None:
+            self.eyelink_blink_data = eyelink_blink_data
+            # internalize all blinks shorter than 4 seconds; longer ones
+            # are treated as missing signal rather than blinks
+            self.blink_starts_EL = (np.array(eyelink_blink_data['start_timestamp']) - self.timepoints[0]) / (1000.0 / self.sample_rate)
+            self.blink_ends_EL = (np.array(eyelink_blink_data['end_timestamp']) - self.timepoints[0]) / (1000.0 / self.sample_rate)
             self.blink_dur_EL = self.blink_ends_EL - self.blink_starts_EL
-            self.blink_starts_EL = self.blink_starts_EL[self.blink_dur_EL<4000]
-            self.blink_ends_EL = self.blink_ends_EL[self.blink_dur_EL<4000]
-            self.blink_dur_EL = self.blink_dur_EL[self.blink_dur_EL<4000]
+            self.blink_starts_EL = self.blink_starts_EL[self.blink_dur_EL < 4000]
+            self.blink_ends_EL = self.blink_ends_EL[self.blink_dur_EL < 4000]
+            self.blink_dur_EL = self.blink_dur_EL[self.blink_dur_EL < 4000]
 
-        if hasattr(self, 'eyelink_sac_data'):
-            self.sac_starts_EL = (np.array(self.eyelink_sac_data['start_timestamp']) - self.timepoints[0]) / (1000.0 / self.sample_rate) # defined in samples
-            self.sac_ends_EL = (np.array(self.eyelink_sac_data['end_timestamp']) - self.timepoints[0]) / (1000.0 / self.sample_rate) # defined in samples
+        if eyelink_sac_data is not None:
+            self.eyelink_sac_data = eyelink_sac_data
+            self.sac_starts_EL = (np.array(eyelink_sac_data['start_timestamp']) - self.timepoints[0]) / (1000.0 / self.sample_rate)
+            self.sac_ends_EL = (np.array(eyelink_sac_data['end_timestamp']) - self.timepoints[0]) / (1000.0 / self.sample_rate)
             self.sac_dur_EL = self.sac_ends_EL - self.sac_starts_EL
 
     def interpolate_blinks(self, method='linear', lin_interpolation_points=[[-150],[150]], spline_interpolation_points=[[-0.15,-0.075], [0.075,0.15]], coalesce_period=500):
@@ -640,31 +646,27 @@ class EyeSignalOperator(Operator):
         frequencies = np.logspace(np.log10(maximal_frequency), np.log10(minimal_frequency), nr_freq_bins)
         self.logger.info('Time_frequency_decomposition_pupil, with filterbank %s'%str(frequencies))
 
-        if tf_decomposition == 'morlet':
-            #z-score self.interpolated_pupil before morlet decomposition of pupil signal
-            interpolated_pupil_z = ((self.interpolated_pupil - np.mean(self.interpolated_pupil))/self.interpolated_pupil.std())
-            #zero-pad runs to avoid edge-artifacts
-            zero_padding_samples = int((1/minimal_frequency)*self.sample_rate*cycle_buffer)
-            padded_interpolated_pupil_z = np.zeros((interpolated_pupil_z.shape[0] + 2*(zero_padding_samples)))
-            padded_interpolated_pupil_z[zero_padding_samples:-zero_padding_samples] = interpolated_pupil_z
-            #filtered signal is real part of Morlet-transformed signal
-            padded_band_pass_filter_bank_pupil = np.squeeze(np.real(mne.time_frequency.cwt_morlet(padded_interpolated_pupil_z[np.newaxis,:], self.sample_rate, frequencies, use_fft=True, n_cycles=n_cycles, zero_mean=True)))
-            #remove zero-padding and save as dataframe with frequencies as index
-            self.band_pass_filter_bank_pupil = pd.DataFrame(np.array([padded_band_pass_filter_bank_pupil[i][zero_padding_samples:-zero_padding_samples] for i in range(len(padded_band_pass_filter_bank_pupil))]).T,columns=frequencies)
+        # The historical 'morlet' option relied on mne.time_frequency.cwt_morlet,
+        # which was removed from MNE; it has been dropped here. Only the
+        # low-pass-butterworth filterbank remains.
+        if tf_decomposition != 'lp_butterworth':
+            raise ValueError(
+                "tf_decomposition must be 'lp_butterworth'; got %r. "
+                "The historical 'morlet' option has been removed -- it "
+                "relied on mne.time_frequency.cwt_morlet, which is no "
+                "longer in MNE." % tf_decomposition)
 
-        elif tf_decomposition == 'lp_butterworth':
-            lp_filter_bank_pupil=np.zeros((len(frequencies), self.interpolated_pupil.shape[0]))
-            lp_cof_samples = [freq / (self.interpolated_pupil.shape[0] / self.sample_rate / 2) for freq in frequencies]
-            for i, lp_cutoff in enumerate(lp_cof_samples):
-                blp, alp = sp.signal.butter(3, lp_cutoff)
-                lp_filt_pupil = sp.signal.filtfilt(blp, alp, self.interpolated_pupil)
-                lp_filter_bank_pupil[i,0:self.interpolated_pupil.shape[0]]=lp_filt_pupil
-            #calculate band passes from the difference between subsequent low pass frequencies (except the last frequency, this one is directly added to the df as the lowest freq in data)
-            band_pass_signals = np.vstack((np.array(lp_filter_bank_pupil[:-1]) - np.array(lp_filter_bank_pupil[1:]), lp_filter_bank_pupil[-1]))
-            self.band_pass_filter_bank_pupil = pd.DataFrame(band_pass_signals.T, columns=frequencies)
-
-        else:
-            print('you did not specify a tf-decomposition')
+        lp_filter_bank_pupil = np.zeros((len(frequencies), self.interpolated_pupil.shape[0]))
+        lp_cof_samples = [freq / (self.interpolated_pupil.shape[0] / self.sample_rate / 2) for freq in frequencies]
+        for i, lp_cutoff in enumerate(lp_cof_samples):
+            blp, alp = sp.signal.butter(3, lp_cutoff)
+            lp_filt_pupil = sp.signal.filtfilt(blp, alp, self.interpolated_pupil)
+            lp_filter_bank_pupil[i, 0:self.interpolated_pupil.shape[0]] = lp_filt_pupil
+        # band passes are the differences between subsequent low-pass
+        # frequencies; the last frequency is added directly as the
+        # lowest band in the data
+        band_pass_signals = np.vstack((np.array(lp_filter_bank_pupil[:-1]) - np.array(lp_filter_bank_pupil[1:]), lp_filter_bank_pupil[-1]))
+        self.band_pass_filter_bank_pupil = pd.DataFrame(band_pass_signals.T, columns=frequencies)
 
 
     def regress_blinks(self, interval=7, regress_blinks=True, regress_sacs=True, regress_xy=False, use_standard_blinksac_kernels=True):
@@ -700,9 +702,15 @@ class EyeSignalOperator(Operator):
             standard_sac_parameters = {'a1':-0.175, 'sh1': 6.451, 'sc1':0.178, 'a2':0.0, 'sh2': 1, 'sc2': 1}
             self.sac_kernel = _double_gamma(standard_sac_parameters, x)
         else:
-
-            from lmfit import minimize, Parameters, Parameter, report_fit
-            import fir
+            from lmfit import minimize, Parameters
+            try:
+                import fir
+            except ImportError as exc:
+                raise ImportError(
+                    "regress_blinks with use_standard_blinksac_kernels=False "
+                    "requires FIRDeconvolution (import name 'fir'); install "
+                    "it from https://github.com/tknapen/FIRDeconvolution"
+                ) from exc
 
             self.downsample_rate = 20
             self.new_sample_rate = self.sample_rate / self.downsample_rate
