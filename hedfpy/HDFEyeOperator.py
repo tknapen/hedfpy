@@ -10,6 +10,51 @@ from .Operator import Operator
 from .EyeSignalOperator import EyeSignalOperator, detect_saccade_from_data
 
 
+#: Default gaze-preprocessing pipeline used by edf_gaze_data_to_hdf when
+#: no ``steps`` argument is supplied. Reproduces hedfpy's historical
+#: behaviour. Override by passing a tuple of step names; see
+#: ``_GAZE_STEP_DEPENDENCIES`` for which steps require which.
+GAZE_PIPELINE_STEPS = (
+    'interpolate',
+    'filter',
+    'regress',
+    'normalize',
+    'summary_plot',
+    'time_frequency',
+)
+
+#: For each step that depends on earlier steps, the set of steps that
+#: must also be included.
+_GAZE_STEP_DEPENDENCIES = {
+    'filter': frozenset({'interpolate'}),
+    'regress': frozenset({'interpolate', 'filter'}),
+    'normalize': frozenset({'filter'}),
+    'summary_plot': frozenset({'interpolate'}),
+    'time_frequency': frozenset({'interpolate'}),
+}
+
+
+def _resolve_gaze_steps(steps):
+    """Validate and return the steps tuple for edf_gaze_data_to_hdf."""
+    if steps is None:
+        return tuple(GAZE_PIPELINE_STEPS)
+    steps = tuple(steps)
+    step_set = set(steps)
+    unknown = step_set - set(GAZE_PIPELINE_STEPS)
+    if unknown:
+        raise ValueError(
+            "unknown gaze preprocessing step(s): %s; valid steps are %s"
+            % (sorted(unknown), list(GAZE_PIPELINE_STEPS)))
+    for step, required in _GAZE_STEP_DEPENDENCIES.items():
+        if step in step_set:
+            missing = required - step_set
+            if missing:
+                raise ValueError(
+                    "step '%s' requires %s to also be included in steps"
+                    % (step, sorted(missing)))
+    return steps
+
+
 class HDFEyeOperator(Operator):
     """
     HDFEyeOperator is typically used to deal with the data from
@@ -180,7 +225,8 @@ class HDFEyeOperator(Operator):
                              nr_freq_bins_filterbank=9,
                              n_cycles_filterbank=1,
                              cycle_buffer_filterbank=3,
-                             tf_decomposition_filterbank='lp_butterworth'
+                             tf_decomposition_filterbank='lp_butterworth',
+                             steps=None,
                              ):
         """
         edf_gaze_data_to_hdf takes the gaze data
@@ -198,36 +244,59 @@ class HDFEyeOperator(Operator):
 
         within the hdf5 file, data are stored under, and can later be retrieved
         at /[source_edf_file_name_without_extension]/[block_name],
-        with the latter being e.g. 'block_1'
+        with the latter being e.g. 'block_1'.
 
-        edf_gaze_data_to_hdf also produces plots of the raw pupil data and
-        blink-interpolated data (stored in pdf files named 'blink_interpolation_1_'[...])
-        and of something akin to the derivative of the pupil data along with
-        markers indicating that variable's peaks (stored in pdf files named 'blink_interpolation_2_'[...])
+        ``steps`` selects which preprocessing stages run per (block, eye):
+        ``'interpolate'``, ``'filter'``, ``'regress'``, ``'normalize'``,
+        ``'summary_plot'`` and ``'time_frequency'``. It defaults to
+        :data:`GAZE_PIPELINE_STEPS`, which reproduces hedfpy's historical
+        behaviour exactly. Pass a subset to skip stages; declared
+        dependencies between steps (see ``_GAZE_STEP_DEPENDENCIES``) are
+        validated up front, before any block is processed.
         """
+
+        steps = _resolve_gaze_steps(steps)
+        step_set = set(steps)
 
         if not hasattr(self, 'edf_operator'):
             self.add_edf_file(edf_file_name=alias)
 
-        if alias == None:
+        if alias is None:
             alias = os.path.split(self.edf_operator.input_file_name)[-1]
         self.logger.info('Adding gaze data from %s to group  %s to %s' % (
             os.path.split(self.edf_operator.input_file_name)[-1], alias, self.input_object))
+
+        # Mapping of (step, column suffix, EyeSignalOperator attribute) in
+        # the historical column-insertion order; iterated for each eye so
+        # that the resulting block_N dataframes keep the same layout when
+        # the default ``steps`` is used.
+        column_specs = (
+            ('interpolate', '_interpolated_timepoints', 'interpolated_time_points'),
+            ('interpolate', '_pupil_int', 'interpolated_pupil'),
+            ('filter',      '_pupil_hp', 'hp_filt_pupil'),
+            ('filter',      '_pupil_baseline', 'baseline_filt_pupil'),
+            ('interpolate', '_gaze_x_int', 'interpolated_x'),
+            ('interpolate', '_gaze_y_int', 'interpolated_y'),
+            ('filter',      '_pupil_lp', 'lp_filt_pupil'),
+            ('regress',     '_pupil_lp_clean', 'lp_filt_pupil_clean'),
+            ('filter',      '_pupil_bp', 'bp_filt_pupil'),
+            ('regress',     '_pupil_bp_clean', 'bp_filt_pupil_clean'),
+        )
 
         #
         #    gaze data in blocks
         #
         with pd.HDFStore(self.input_object) as h5_file:
             # recreate the non-gaze data for the block, that is, its sampling rate, eye of origin etc.
-            blocks_data_frame = pd.DataFrame([dict([[i, self.edf_operator.blocks[j][i]] for i in self.edf_operator.blocks[0].keys(
-            ) if i not in ('block_data', 'data_columns')]) for j in range(len(self.edf_operator.blocks))])
+            blocks_data_frame = pd.DataFrame([dict([[k, self.edf_operator.blocks[j][k]] for k in self.edf_operator.blocks[0].keys(
+            ) if k not in ('block_data', 'data_columns')]) for j in range(len(self.edf_operator.blocks))])
             h5_file.put("/%s/blocks" % alias, blocks_data_frame)
 
             # gaze data per block
             if not 'block_data' in self.edf_operator.blocks[0].keys():
                 self.edf_operator.take_gaze_data_for_blocks()
             for i, block in enumerate(self.edf_operator.blocks):
-                bdf = pd.DataFrame(block['block_data'][:,:len(block['data_columns'])],
+                bdf = pd.DataFrame(block['block_data'][:, :len(block['data_columns'])],
                                    columns=block['data_columns'])
 
                 #
@@ -236,11 +305,11 @@ class HDFEyeOperator(Operator):
                 # this is a string with one or two letters, 'L', 'R' or 'LR'
                 for eye in blocks_data_frame.eye_recorded[i]:
                     # create dictionary of data per block:
-                    gazeX = bdf[eye+'_gaze_x']
-                    gazeY = bdf[eye+'_gaze_y']
-                    pupil = bdf[eye+'_pupil']
+                    gazeX = bdf[eye + '_gaze_x']
+                    gazeY = bdf[eye + '_gaze_y']
+                    pupil = bdf[eye + '_pupil']
                     eye_dict = {'timepoints': bdf.time, 'gaze_X': gazeX,
-                                'gaze_Y': gazeY, 'pupil': pupil, }
+                                'gaze_Y': gazeY, 'pupil': pupil}
 
                     # create instance of class EyeSignalOperator, and include the blink data as detected by the Eyelink 1000:
                     if hasattr(self.edf_operator, 'blinks_from_message_file') and hasattr(self.edf_operator, 'saccades_from_message_file'):
@@ -260,85 +329,78 @@ class HDFEyeOperator(Operator):
                         regress_sacs = False
                         regress_blinks = False
 
-                    # interpolate blinks:
-                    eso.interpolate_blinks(method='linear')
-                    eso.interpolate_blinks2()
+                    # --- compute the requested preprocessing steps ---
+                    if 'interpolate' in step_set:
+                        eso.interpolate_blinks(method='linear')
+                        eso.interpolate_blinks2()
+                    if 'filter' in step_set:
+                        eso.filter_pupil(hp=pupil_hp, lp=pupil_lp)
+                    if 'regress' in step_set:
+                        try:
+                            eso.regress_blinks(regress_blinks=regress_blinks, regress_sacs=regress_sacs,
+                                               regress_xy=regress_xy, use_standard_blinksac_kernels=use_standard_blinksac_kernels)
+                        except:
+                            eso.lp_filt_pupil_clean = eso.lp_filt_pupil.copy()
+                            eso.bp_filt_pupil_clean = eso.bp_filt_pupil.copy()
 
-                    # low-pass and band-pass pupil data:
-                    eso.filter_pupil(hp=pupil_hp, lp=pupil_lp)
+                    # --- write the result columns in their historical order ---
+                    for step, col_suffix, attr in column_specs:
+                        if step in step_set:
+                            bdf[eye + col_suffix] = getattr(eso, attr)
 
-                    # # now dt the resulting pupil data:
-                    # eso.dt_pupil(dtype='lp_filt_pupil')
-                    # eso.dt_pupil(dtype='bp_filt_pupil')
-
-                    # regress blink and saccade responses
-                    try:
-                        eso.regress_blinks(regress_blinks=regress_blinks, regress_sacs=regress_sacs,
-                                           regress_xy=regress_xy, use_standard_blinksac_kernels=use_standard_blinksac_kernels)
-                    except:
-                        eso.lp_filt_pupil_clean = eso.lp_filt_pupil.copy()
-                        eso.bp_filt_pupil_clean = eso.bp_filt_pupil.copy()
-
-                    # add to existing dataframe:
-                    bdf[eye+'_interpolated_timepoints'] = eso.interpolated_time_points
-                    bdf[eye+'_pupil_int'] = eso.interpolated_pupil
-                    bdf[eye+'_pupil_hp'] = eso.hp_filt_pupil
-                    bdf[eye+'_pupil_baseline'] = eso.baseline_filt_pupil
-                    bdf[eye+'_gaze_x_int'] = eso.interpolated_x
-                    bdf[eye+'_gaze_y_int'] = eso.interpolated_y
-
-                    bdf[eye+'_pupil_lp'] = eso.lp_filt_pupil
-                    # bdf[eye+'_pupil_lp_dt'] = eso.lp_filt_pupil_dt
-                    bdf[eye+'_pupil_lp_clean'] = eso.lp_filt_pupil_clean
-
-                    bdf[eye+'_pupil_bp'] = eso.bp_filt_pupil
-                    # bdf[eye+'_pupil_bp_dt'] = eso.bp_filt_pupil_dt
-                    bdf[eye+'_pupil_bp_clean'] = eso.bp_filt_pupil_clean
-
-                    # add normalized timeseries:
-                    if normalization == 'zscore':
-                        eso.zscore_pupil(dtype='lp_filt_pupil')
-                        eso.zscore_pupil(dtype='lp_filt_pupil_clean')
-                        eso.zscore_pupil(dtype='bp_filt_pupil')
-                        eso.zscore_pupil(dtype='bp_filt_pupil_clean')
-                        bdf[eye+'_pupil_lp_zscore'] = eso.lp_filt_pupil_zscore
-                        bdf[eye+'_pupil_lp_clean_zscore'] = eso.lp_filt_pupil_clean_zscore
-                        bdf[eye+'_pupil_bp_zscore'] = eso.bp_filt_pupil_zscore
-                        bdf[eye+'_pupil_bp_clean_zscore'] = eso.bp_filt_pupil_clean_zscore
-                    if normalization == 'psc':
-                        eso.percent_signal_change_pupil(dtype='lp_filt_pupil')
-                        eso.percent_signal_change_pupil(dtype='lp_filt_pupil_clean')
-                        eso.percent_signal_change_pupil(dtype='bp_filt_pupil')
-                        eso.percent_signal_change_pupil(dtype='bp_filt_pupil_clean')
-                        bdf[eye+'_pupil_lp_psc'] = eso.lp_filt_pupil_psc
-                        bdf[eye+'_pupil_lp_clean_psc'] = eso.lp_filt_pupil_clean_psc
-                        bdf[eye+'_pupil_bp_psc'] = eso.bp_filt_pupil_psc
-                        bdf[eye+'_pupil_bp_clean_psc'] = eso.bp_filt_pupil_clean_psc
+                    # add normalized timeseries (lp / lp_clean / bp / bp_clean
+                    # interleaved to match the historical layout when regress
+                    # is included; lp_clean / bp_clean are skipped otherwise):
+                    if 'normalize' in step_set:
+                        if normalization == 'zscore':
+                            eso.zscore_pupil(dtype='lp_filt_pupil')
+                            bdf[eye + '_pupil_lp_zscore'] = eso.lp_filt_pupil_zscore
+                            if 'regress' in step_set:
+                                eso.zscore_pupil(dtype='lp_filt_pupil_clean')
+                                bdf[eye + '_pupil_lp_clean_zscore'] = eso.lp_filt_pupil_clean_zscore
+                            eso.zscore_pupil(dtype='bp_filt_pupil')
+                            bdf[eye + '_pupil_bp_zscore'] = eso.bp_filt_pupil_zscore
+                            if 'regress' in step_set:
+                                eso.zscore_pupil(dtype='bp_filt_pupil_clean')
+                                bdf[eye + '_pupil_bp_clean_zscore'] = eso.bp_filt_pupil_clean_zscore
+                        elif normalization == 'psc':
+                            eso.percent_signal_change_pupil(dtype='lp_filt_pupil')
+                            bdf[eye + '_pupil_lp_psc'] = eso.lp_filt_pupil_psc
+                            if 'regress' in step_set:
+                                eso.percent_signal_change_pupil(dtype='lp_filt_pupil_clean')
+                                bdf[eye + '_pupil_lp_clean_psc'] = eso.lp_filt_pupil_clean_psc
+                            eso.percent_signal_change_pupil(dtype='bp_filt_pupil')
+                            bdf[eye + '_pupil_bp_psc'] = eso.bp_filt_pupil_psc
+                            if 'regress' in step_set:
+                                eso.percent_signal_change_pupil(dtype='bp_filt_pupil_clean')
+                                bdf[eye + '_pupil_bp_clean_psc'] = eso.bp_filt_pupil_clean_psc
 
                     # save summary plot:
-                    try:
-                        fig = eso.summary_plot(alias=alias, i=i, eye=eye)
-                        fig.savefig(os.path.join(os.path.split(self.input_object)[0], 'preprocess_{}_{}_{}.pdf'.format(alias, i, eye)))
-                    except:
-                        pass
+                    if 'summary_plot' in step_set:
+                        try:
+                            fig = eso.summary_plot(alias=alias, i=i, eye=eye)
+                            fig.savefig(os.path.join(os.path.split(self.input_object)[0], 'preprocess_{}_{}_{}.pdf'.format(alias, i, eye)))
+                        except:
+                            pass
 
                     # try time-frequency decomposition of the baseline signal
-                    try:
-                        eso.time_frequency_decomposition_pupil(
-                            minimal_frequency=minimal_frequency_filterbank,
-                            maximal_frequency=maximal_frequency_filterbank,
-                            nr_freq_bins=nr_freq_bins_filterbank,
-                            n_cycles=n_cycles_filterbank,
-                            cycle_buffer=cycle_buffer_filterbank,
-                            tf_decomposition=tf_decomposition_filterbank,
-                        )
-                        self.logger.info('Performed T-F analysis of type %s' % tf_decomposition_filterbank)
-                        for freq in eso.band_pass_filter_bank_pupil.keys():
-                            bdf[eye+'_pupil_filterbank_bp_%2.5f' % freq] = eso.band_pass_filter_bank_pupil[freq]
-                            self.logger.info('Saved T-F analysis %2.5f' % freq)
-                    except:
-                        self.logger.error('Something went wrong with T-F analysis of type %s' % tf_decomposition_filterbank)
-                        pass
+                    if 'time_frequency' in step_set:
+                        try:
+                            eso.time_frequency_decomposition_pupil(
+                                minimal_frequency=minimal_frequency_filterbank,
+                                maximal_frequency=maximal_frequency_filterbank,
+                                nr_freq_bins=nr_freq_bins_filterbank,
+                                n_cycles=n_cycles_filterbank,
+                                cycle_buffer=cycle_buffer_filterbank,
+                                tf_decomposition=tf_decomposition_filterbank,
+                            )
+                            self.logger.info('Performed T-F analysis of type %s' % tf_decomposition_filterbank)
+                            for freq in eso.band_pass_filter_bank_pupil.keys():
+                                bdf[eye + '_pupil_filterbank_bp_%2.5f' % freq] = eso.band_pass_filter_bank_pupil[freq]
+                                self.logger.info('Saved T-F analysis %2.5f' % freq)
+                        except:
+                            self.logger.error('Something went wrong with T-F analysis of type %s' % tf_decomposition_filterbank)
+                            pass
 
                 # put in HDF5:
                 h5_file.put("/%s/block_%i" % (alias, i), bdf)

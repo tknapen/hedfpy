@@ -25,7 +25,7 @@ It additionally needs the HDF5 libraries and the `edf2asc` command-line utility 
 
 TODO
 1. ~~The regular expressions that parse experiment-generated `MSG` strings are hard-coded in `EDFOperator`.~~ Done: they now live in a configurable `MessageGrammar` (see above).
-2. hedfpy processes an edf file according to a fixed set of preprocessing steps (see the code in `HDFEyeOperator`'s `edf_gaze_data_to_hdf`). These need to be made elective at some point.
+2. ~~hedfpy processes an edf file according to a fixed set of preprocessing steps.~~ Done: `edf_gaze_data_to_hdf` accepts a `steps=` argument selecting which stages (`interpolate`, `filter`, `regress`, `normalize`, `summary_plot`, `time_frequency`) run; the default `GAZE_PIPELINE_STEPS` reproduces the historical behaviour.
 
 
 
