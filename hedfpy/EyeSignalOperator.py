@@ -702,34 +702,50 @@ class EyeSignalOperator(Operator):
             standard_sac_parameters = {'a1':-0.175, 'sh1': 6.451, 'sc1':0.178, 'a2':0.0, 'sh2': 1, 'sc2': 1}
             self.sac_kernel = _double_gamma(standard_sac_parameters, x)
         else:
-            from lmfit import minimize, Parameters
             try:
-                import fir
+                from nideconv import ResponseFitter
             except ImportError as exc:
                 raise ImportError(
                     "regress_blinks with use_standard_blinksac_kernels=False "
-                    "requires FIRDeconvolution (import name 'fir'); install "
-                    "it from https://github.com/tknapen/FIRDeconvolution"
+                    "requires nideconv (which superseded FIRDeconvolution). "
+                    "Install it with `pip install hedfpy[deconv]` or, "
+                    "directly, `pip install "
+                    "git+https://github.com/VU-Cog-Sci/nideconv`."
                 ) from exc
+            from lmfit import minimize, Parameters
+            from scipy.signal import decimate
 
             self.downsample_rate = 20
             self.new_sample_rate = self.sample_rate / self.downsample_rate
 
-            events = [blinks/float(self.sample_rate),  # defined in seconds
-                      sacs/float(self.sample_rate)]  # defined in seconds
+            # event onsets in seconds, relative to the start of bp_filt_pupil
+            blink_onsets = blinks / float(self.sample_rate)
+            sac_onsets = sacs / float(self.sample_rate)
 
-            # # compute blink and sac kernels with deconvolution (on downsampled timeseries):
-            # do = DeconvolutionOperator( inputObject=sp.signal.decimate(self.bp_filt_pupil, self.downsample_rate, 1), eventObject=events, TR=(1.0 / self.new_sample_rate), deconvolutionSampleDuration=(1.0 / self.new_sample_rate), deconvolutionInterval=interval, run=True )
-            # self.blink_response_downsampled = np.array(do.deconvolvedTimeCoursesPerEventType[0]).ravel()
-            # self.sac_response_downsampled = np.array(do.deconvolvedTimeCoursesPerEventType[1]).ravel()
+            # Fit the FIR responses on a decimated copy of the band-pass
+            # pupil signal so each FIR coefficient covers one sample of
+            # the downsampled signal (1 / new_sample_rate seconds). This
+            # mirrors the (signal at sample_rate, response at
+            # new_sample_rate) split the old FIRDeconvolution call had.
+            downsampled_signal = decimate(
+                self.bp_filt_pupil.astype('float64'),
+                self.downsample_rate, ftype='fir', zero_phase=True)
+            rf = ResponseFitter(
+                input_signal=downsampled_signal,
+                sample_rate=self.new_sample_rate)
+            rf.add_event('blinks', onsets=blink_onsets,
+                         basis_set='fir', interval=[0, interval])
+            rf.add_event('sacs', onsets=sac_onsets,
+                         basis_set='fir', interval=[0, interval])
+            rf.fit(type='ols')
 
-            # compute blink and sac kernels with deconvolution (on downsampled timeseries):
-            a = fir.FIRDeconvolution(signal=self.bp_filt_pupil, events=events, event_names=['blinks', 'sacs'], sample_frequency=self.sample_rate, deconvolution_frequency=self.new_sample_rate, deconvolution_interval=[0,interval],)
-            a.create_design_matrix()
-            a.regress()
-            a.betas_for_events()
-            self.blink_response_downsampled = np.array(a.betas_per_event_type[0]).ravel()
-            self.sac_response_downsampled = np.array(a.betas_per_event_type[1]).ravel()
+            # extract each event's response at the FIR's own resolution
+            # (oversample=1 disables nideconv's default 20x upsampling)
+            timecourses = rf.get_timecourses(oversample=1)
+            self.blink_response_downsampled = np.asarray(
+                timecourses.xs('blinks', level='event type')).ravel()
+            self.sac_response_downsampled = np.asarray(
+                timecourses.xs('sacs', level='event type')).ravel()
 
             # demean kernels:
             self.blink_response_downsampled = self.blink_response_downsampled - self.blink_response_downsampled[:int(0.2*self.new_sample_rate)].mean()
@@ -754,7 +770,7 @@ class EyeSignalOperator(Operator):
             self.sac_fit = _double_pupil_IRF(sac_result.params, x)
 
             # upsample:
-            x = np.linspace(0,interval,interval*self.sample_rate)
+            x = np.linspace(0, interval, int(interval * self.sample_rate))
             self.blink_kernel = _double_pupil_IRF(blink_result.params, x)
             self.sac_kernel = _double_pupil_IRF(sac_result.params, x)
 
@@ -794,7 +810,6 @@ class EyeSignalOperator(Operator):
             regs_titles.append('intercept')
             regs_titles.append('gaze_x')
             regs_titles.append('gaze_y')
-        print([r.shape for r in regs])
 
         # GLM (ordinary least squares: betas = (X'X)^-1 X'y):
         design_matrix = np.vstack([reg for reg in regs]).T

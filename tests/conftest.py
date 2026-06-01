@@ -15,6 +15,14 @@ next to the input ``.edf`` and we never want it mutating the committed
 fixtures.
 """
 
+# Force a non-interactive matplotlib backend before anything in the test
+# suite (or hedfpy itself) imports matplotlib.pyplot. The pipeline's
+# summary_plot step instantiates a figure and would otherwise try to talk
+# to a Qt display, which hangs (does not raise) on headless or
+# X-forwarding-dropped sessions.
+import os
+os.environ.setdefault("MPLBACKEND", "Agg")
+
 import shutil
 import warnings
 from pathlib import Path

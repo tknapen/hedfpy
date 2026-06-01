@@ -109,6 +109,89 @@ def test_subset_pipeline_skips_regress_and_tf(tmp_path):
     assert not any(c.startswith("L_pupil_filterbank") for c in cols)
 
 
+def test_regress_blinks_without_nideconv_raises_clean_error():
+    """When `use_standard_blinksac_kernels=False`, regress_blinks needs
+    nideconv; without it, the ImportError should name the optional extra
+    and the GitHub install command rather than the bare module name."""
+    try:
+        import nideconv  # noqa: F401
+        pytest.skip("nideconv is installed; covered by the run test")
+    except ImportError:
+        pass
+
+    import numpy as np
+    from hedfpy import EyeSignalOperator
+
+    eso = EyeSignalOperator(
+        input_object={
+            "timepoints": np.arange(10000, dtype=float),
+            "gaze_X": np.zeros(10000),
+            "gaze_Y": np.zeros(10000),
+            "pupil": np.ones(10000),
+        },
+        sample_rate=1000.0,
+    )
+    # The minimum attributes for regress_blinks to reach the nideconv import:
+    eso.bp_filt_pupil = np.ones(10000)
+    eso.blink_ends = np.array([], dtype=int)
+    eso.sac_ends_EL = np.array([], dtype=int)
+    with pytest.raises(ImportError, match="nideconv"):
+        eso.regress_blinks(use_standard_blinksac_kernels=False)
+
+
+def test_regress_blinks_with_nideconv_recovers_kernels():
+    """End-to-end smoke test of the nideconv-based deconvolution path.
+
+    Skipped when nideconv (an optional, hedfpy[deconv] dependency) is not
+    installed -- on supported environments where it is, this exercises
+    the full regress_blinks(use_standard_blinksac_kernels=False) flow
+    and asserts the resulting kernel arrays have the expected shapes.
+    """
+    pytest.importorskip("nideconv")
+
+    import numpy as np
+    from hedfpy import EyeSignalOperator
+
+    sample_rate = 100.0
+    n = 6000  # 60 s at 100 Hz: long enough for the early/late cutoffs
+    rng = np.random.default_rng(0)
+
+    eso = EyeSignalOperator(
+        input_object={
+            "timepoints": np.arange(n, dtype=float),
+            "gaze_X": np.zeros(n),
+            "gaze_Y": np.zeros(n),
+            "pupil": np.ones(n),
+        },
+        sample_rate=sample_rate,
+    )
+    # minimum state to reach regress_blinks (skipping interpolate / filter)
+    eso.bp_filt_pupil = rng.standard_normal(n) * 0.1
+    eso.lp_filt_pupil = eso.bp_filt_pupil.copy()
+    eso.baseline_filt_pupil = np.ones(n) * 100.0
+    eso.blink_ends = np.array([3000, 3800, 4200, 4800, 5200])
+    eso.sac_ends_EL = np.array([3100, 3500, 4000, 4500, 5000, 5500])
+    eso.interpolated_x = np.zeros(n)
+    eso.interpolated_y = np.zeros(n)
+
+    interval = 7
+    eso.regress_blinks(interval=interval, use_standard_blinksac_kernels=False)
+
+    # FIR response is at new_sample_rate = sample_rate / downsample_rate
+    expected_response_len = int(interval * eso.new_sample_rate)
+    assert eso.blink_response_downsampled.shape == (expected_response_len,)
+    assert eso.sac_response_downsampled.shape == (expected_response_len,)
+
+    # kernels are upsampled back to the input sample rate
+    expected_kernel_len = int(interval * sample_rate)
+    assert eso.blink_kernel.shape == (expected_kernel_len,)
+    assert eso.sac_kernel.shape == (expected_kernel_len,)
+
+    # the residual cleaned signal stays at the original length
+    assert eso.bp_filt_pupil_clean.shape == (n,)
+    assert eso.lp_filt_pupil_clean.shape == (n,)
+
+
 def test_time_frequency_decomposition_rejects_morlet():
     """The historical morlet TF path has been removed; requesting it now
     raises a clear error rather than blowing up on the missing MNE API."""

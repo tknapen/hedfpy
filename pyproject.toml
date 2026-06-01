@@ -42,6 +42,10 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest", "ruff"]
+# Optional: data-driven blink / saccade kernels in EyeSignalOperator
+# (`regress_blinks(use_standard_blinksac_kernels=False)`). nideconv is
+# not on PyPI, so the dep is pinned to its git repository.
+deconv = ["nideconv @ git+https://github.com/VU-Cog-Sci/nideconv"]
 
 [project.urls]
 Homepage = "https://github.com/tknapen/hedfpy"

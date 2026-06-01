@@ -23,6 +23,8 @@ hedfpy is installed with `pip install .`, which pulls in its Python dependencies
 
 It additionally needs the HDF5 libraries and the `edf2asc` command-line utility from [SR Research](http://www.sr-research.com "SR Research") available on the `$PATH`.
 
+For data-driven blink and saccade kernels (`regress_blinks(use_standard_blinksac_kernels=False)`), install the optional [`nideconv`](https://github.com/VU-Cog-Sci/nideconv) dependency: `pip install hedfpy[deconv]`. The default kernel-fitting path uses standard parameters and does not need it.
+
 TODO
 1. ~~The regular expressions that parse experiment-generated `MSG` strings are hard-coded in `EDFOperator`.~~ Done: they now live in a configurable `MessageGrammar` (see above).
 2. ~~hedfpy processes an edf file according to a fixed set of preprocessing steps.~~ Done: `edf_gaze_data_to_hdf` accepts a `steps=` argument selecting which stages (`interpolate`, `filter`, `regress`, `normalize`, `summary_plot`, `time_frequency`) run; the default `GAZE_PIPELINE_STEPS` reproduces the historical behaviour.
